@@ -134,4 +134,24 @@ export async function userRoutes(app: FastifyInstance) {
   app.get('/users', async () => {
     return prisma.user.findMany()
   })
+
+  app.delete('/users/:id', async (request, reply) => {
+    const { id } = request.params as any
+    
+    const user = await prisma.user.findUnique({
+      where: { id }
+    })
+
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found' })
+    }
+
+    if (user.username === 'admin') {
+      return reply.status(403).send({ error: 'Cannot delete the main admin' })
+    }
+
+    await prisma.user.delete({ where: { id } })
+    
+    return { success: true }
+  })
 }
