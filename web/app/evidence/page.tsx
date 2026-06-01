@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react'
 import { Sidebar } from '@/components/sidebar'
 import { Topbar } from '@/components/topbar'
 import { EvidenceBoardFull } from '@/components/evidence-board-full'
-import { Plus, Settings, Grid3X3, X, Lock } from 'lucide-react'
+import { Plus, Settings, Grid3X3, X, Lock, Loader2, Trash2, ExternalLink } from 'lucide-react'
+import axios from 'axios'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 interface Board {
   id: string
@@ -20,11 +23,14 @@ const MAX_BOARDS_PER_USER = 5
 export default function EvidencePage() {
   const [ready, setReady] = useState(false)
   const [boards, setBoards] = useState<Board[]>([])
+  const [loadingBoards, setLoadingBoards] = useState(true)
   const [selectedBoard, setSelectedBoard] = useState<string>('main-case')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
   const [newBoardDesc, setNewBoardDesc] = useState('')
   const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [deletingBoard, setDeletingBoard] = useState<string | null>(null)
 
   useEffect(() => {
     const userStr = localStorage.getItem('cid_user')
@@ -33,15 +39,40 @@ export default function EvidencePage() {
       return
     }
     setReady(true)
-    
-    // Load boards
-    setBoards([
-      { id: 'main-case', name: 'Main Investigation', description: 'Primary case evidence network', nodeCount: 6, edgeCount: 7, createdAt: '2026-06-01' },
-      { id: 'case-1247', name: 'Operation Thunder', description: 'High priority target network', nodeCount: 12, edgeCount: 18, createdAt: '2026-05-28' },
-    ])
+    loadBoards()
   }, [])
 
-  const handleCreateBoard = () => {
+  const loadBoards = async () => {
+    setLoadingBoards(true)
+    try {
+      const response = await axios.get(`${API_URL}/boards`)
+      setBoards(response.data)
+      
+      // If no boards, create a default one
+      if (response.data.length === 0) {
+        await axios.post(`${API_URL}/boards`, {
+          name: 'Main Investigation',
+          description: 'Primary case evidence network'
+        })
+        loadBoards()
+      }
+    } catch (error) {
+      console.error('Error loading boards:', error)
+      // Create default board on error
+      try {
+        await axios.post(`${API_URL}/boards`, {
+          name: 'Main Investigation',
+          description: 'Primary case evidence network'
+        })
+        loadBoards()
+      } catch (e) {
+        console.error('Error creating default board:', e)
+      }
+    }
+    setLoadingBoards(false)
+  }
+
+  const handleCreateBoard = async () => {
     if (!newBoardName.trim()) {
       setCreateError('Board name is required')
       return
@@ -52,29 +83,43 @@ export default function EvidencePage() {
       return
     }
 
-    const newBoard: Board = {
-      id: `board-${Date.now()}`,
-      name: newBoardName.trim(),
-      description: newBoardDesc.trim(),
-      nodeCount: 0,
-      edgeCount: 0,
-      createdAt: new Date().toISOString().split('T')[0]
+    setCreating(true)
+    try {
+      const response = await axios.post(`${API_URL}/boards`, {
+        name: newBoardName.trim(),
+        description: newBoardDesc.trim()
+      })
+      
+      if (response.data.error) {
+        setCreateError(response.data.error)
+      } else {
+        setBoards([...boards, response.data])
+        setSelectedBoard(response.data.id)
+        setNewBoardName('')
+        setNewBoardDesc('')
+        setShowCreateModal(false)
+        setCreateError('')
+      }
+    } catch (error) {
+      setCreateError('Failed to create board')
     }
-    
-    setBoards([...boards, newBoard])
-    setSelectedBoard(newBoard.id)
-    setNewBoardName('')
-    setNewBoardDesc('')
-    setShowCreateModal(false)
-    setCreateError('')
+    setCreating(false)
   }
 
-  const handleDeleteBoard = (boardId: string) => {
-    if (boardId === 'main-case') return // Can't delete main case
-    setBoards(boards.filter(b => b.id !== boardId))
-    if (selectedBoard === boardId) {
-      setSelectedBoard('main-case')
+  const handleDeleteBoard = async (boardId: string) => {
+    if (boardId === 'main-case') return
+    
+    setDeletingBoard(boardId)
+    try {
+      await axios.delete(`${API_URL}/boards/${boardId}`)
+      setBoards(boards.filter(b => b.id !== boardId))
+      if (selectedBoard === boardId) {
+        setSelectedBoard(boards.length > 1 ? boards.find(b => b.id !== boardId)?.id || 'main-case' : 'main-case')
+      }
+    } catch (error) {
+      console.error('Error deleting board:', error)
     }
+    setDeletingBoard(null)
   }
 
   if (!ready) {
@@ -101,9 +146,12 @@ export default function EvidencePage() {
               </p>
             </div>
             <div className='flex items-center gap-3'>
-              <button className='flex items-center gap-2 px-4 py-2 bg-[#1a1a22] border border-[#2a2a35] rounded-xl text-[#B7B7B7] hover:text-white hover:border-[#3a3a45] transition-all text-sm'>
-                <Grid3X3 className='w-4 h-4' />
-                All Boards
+              <button 
+                onClick={loadBoards}
+                className='flex items-center gap-2 px-4 py-2 bg-[#1a1a22] border border-[#2a2a35] rounded-xl text-[#B7B7B7] hover:text-white hover:border-[#3a3a45] transition-all text-sm'
+              >
+                <Loader2 className={`w-4 h-4 ${loadingBoards ? 'animate-spin' : ''}`} />
+                Refresh
               </button>
               <button 
                 onClick={() => setShowCreateModal(true)}
@@ -117,46 +165,66 @@ export default function EvidencePage() {
             </div>
           </div>
 
-          {/* Boards Grid */}
-          <div className='grid grid-cols-4 gap-4 mb-6'>
-            {boards.map((board) => (
-              <button
-                key={board.id}
-                onClick={() => setSelectedBoard(board.id)}
-                className={`bg-gradient-to-br from-[#1a1a22] to-[#25252f] border rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] ${
-                  selectedBoard === board.id 
-                    ? 'border-red-500 shadow-lg shadow-red-500/20' 
-                    : 'border-[#2a2a35] hover:border-[#3a3a45]'
-                }`}
-              >
-                <div className='flex items-center justify-between mb-4'>
-                  <div className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20'>
-                    <Grid3X3 className='w-5 h-5 text-white' />
-                  </div>
-                  {board.id !== 'main-case' && (
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteBoard(board.id); }}
-                      className='p-1 hover:bg-red-500/20 rounded-lg transition-colors'
+          {/* Loading State */}
+          {loadingBoards ? (
+            <div className='flex items-center justify-center py-20'>
+              <Loader2 className='w-8 h-8 text-red-500 animate-spin' />
+              <span className='ml-3 text-[#7E8299]'>Loading boards...</span>
+            </div>
+          ) : (
+            <>
+              {/* Boards Grid */}
+              <div className='grid grid-cols-4 gap-4 mb-6'>
+                {boards.map((board) => (
+                  <div
+                    key={board.id}
+                    className={`bg-gradient-to-br from-[#1a1a22] to-[#25252f] border rounded-2xl p-5 text-left transition-all duration-300 hover:scale-[1.02] ${
+                      selectedBoard === board.id 
+                        ? 'border-red-500 shadow-lg shadow-red-500/20' 
+                        : 'border-[#2a2a35] hover:border-[#3a3a45]'
+                    } ${deletingBoard === board.id ? 'opacity-50' : ''}`}
+                  >
+                    <div className='flex items-center justify-between mb-4'>
+                      <button
+                        onClick={() => setSelectedBoard(board.id)}
+                        className='w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20'
+                      >
+                        <Grid3X3 className='w-5 h-5 text-white' />
+                      </button>
+                      {board.id !== 'main-case' && (
+                        <div className='flex items-center gap-1'>
+                          <button 
+                            onClick={() => handleDeleteBoard(board.id)}
+                            disabled={deletingBoard === board.id}
+                            className='p-1.5 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50'
+                          >
+                            <Trash2 className='w-4 h-4 text-[#5a5a6e] hover:text-red-400' />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSelectedBoard(board.id)}
+                      className='w-full text-left'
                     >
-                      <X className='w-4 h-4 text-[#5a5a6e] hover:text-red-400' />
+                      <h3 className='text-white font-semibold mb-1'>{board.name}</h3>
+                      <p className='text-[#7E8299] text-xs mb-3 line-clamp-1'>{board.description || 'No description'}</p>
+                      <div className='flex items-center gap-3 text-xs text-[#5a5a6e]'>
+                        <span>{board.nodeCount} nodes</span>
+                        <span>•</span>
+                        <span>{board.edgeCount} connections</span>
+                      </div>
                     </button>
-                  )}
-                </div>
-                <h3 className='text-white font-semibold mb-1'>{board.name}</h3>
-                <p className='text-[#7E8299] text-xs mb-3 line-clamp-1'>{board.description || 'No description'}</p>
-                <div className='flex items-center gap-3 text-xs text-[#5a5a6e]'>
-                  <span>{board.nodeCount} nodes</span>
-                  <span>•</span>
-                  <span>{board.edgeCount} connections</span>
-                </div>
-              </button>
-            ))}
-          </div>
+                  </div>
+                ))}
+              </div>
 
-          {/* Evidence Board */}
-          <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: 'calc(100vh - 320px)' }}>
-            <EvidenceBoardFull boardId={selectedBoard} />
-          </div>
+              {/* Evidence Board */}
+              <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: 'calc(100vh - 320px)' }}>
+                {selectedBoard && <EvidenceBoardFull key={selectedBoard} boardId={selectedBoard} />}
+              </div>
+            </>
+          )}
 
         </div>
       </div>
@@ -215,9 +283,17 @@ export default function EvidencePage() {
                 </button>
                 <button
                   onClick={handleCreateBoard}
-                  className='flex-1 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 rounded-xl text-white font-semibold transition-all shadow-lg shadow-red-500/20'
+                  disabled={creating}
+                  className='flex-1 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 rounded-xl text-white font-semibold transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2'
                 >
-                  Create Board
+                  {creating ? (
+                    <>
+                      <Loader2 className='w-4 h-4 animate-spin' />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Board'
+                  )}
                 </button>
               </div>
             </div>
