@@ -7,19 +7,19 @@ export async function graphRoutes(app: FastifyInstance) {
      GET GRAPH
   ========================= */
 
-  app.get('/graph/:caseId', async (req: any) => {
+  app.get('/graph/:boardId', async (req: any) => {
 
-    const { caseId } = req.params
+    const { boardId } = req.params
 
     const nodes = await prisma.graphNode.findMany({
       where: {
-        caseId
+        boardId
       }
     })
 
     const edges = await prisma.graphEdge.findMany({
       where: {
-        caseId
+        boardId
       }
     })
 
@@ -41,7 +41,7 @@ export async function graphRoutes(app: FastifyInstance) {
 
       data: {
 
-        caseId: body.caseId,
+        boardId: body.boardId,
 
         nodeType: body.nodeType,
 
@@ -54,7 +54,6 @@ export async function graphRoutes(app: FastifyInstance) {
         metadata: body.metadata || ''
 
       }
-
     })
 
     return node
@@ -72,7 +71,7 @@ export async function graphRoutes(app: FastifyInstance) {
 
       data: {
 
-        caseId: body.caseId,
+        boardId: body.boardId,
 
         source: body.source,
 
@@ -81,7 +80,6 @@ export async function graphRoutes(app: FastifyInstance) {
         label: body.label || ''
 
       }
-
     })
 
     return edge
@@ -100,12 +98,15 @@ export async function graphRoutes(app: FastifyInstance) {
     const node = await prisma.graphNode.update({
 
       where: {
+
         id
+
       },
 
       data: {
 
         x: body.x,
+
         y: body.y
 
       }
@@ -114,5 +115,4 @@ export async function graphRoutes(app: FastifyInstance) {
 
     return node
   })
-
 }

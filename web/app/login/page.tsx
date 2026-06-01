@@ -1,12 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 import { AlertTriangle, X, ShieldAlert } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    // Check if already logged in
+    const user = localStorage.getItem('cid_user')
+    if (user) {
+      router.push('/')
+    }
+  }, [router])
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -29,7 +39,7 @@ export default function LoginPage() {
         JSON.stringify(res.data)
       )
     
-      router.push('/dashboard')
+      router.push('/')
     
     } catch (err: any) {
       const message = err.response?.data?.error || 'Invalid credentials. Access denied.'
@@ -38,6 +48,14 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (!mounted) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-[#212129]">
+        <div className="w-12 h-12 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
+      </main>
+    )
   }
 
   return (

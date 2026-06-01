@@ -101,6 +101,23 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
+    // Auth check
+    const userStr = localStorage.getItem('cid_user')
+    if (!userStr) {
+      window.location.href = '/login'
+      return
+    }
+    try {
+      const user = JSON.parse(userStr)
+      if (!user || !user.user) {
+        window.location.href = '/login'
+        return
+      }
+    } catch (e) {
+      window.location.href = '/login'
+      return
+    }
+    // Fetch users after auth check
     fetchUsers()
   }, [])
 
