@@ -9,7 +9,8 @@ import { graphRoutes } from './graph'
 const app = Fastify({ logger: true })
 
 app.register(cors, {
-  origin: true
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
 })
 app.register(userRoutes)
 app.register(evidenceRoutes)

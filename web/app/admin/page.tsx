@@ -90,12 +90,13 @@ export default function AdminPage() {
 
   async function deleteUser(userId: string) {
     try {
-      await axios.delete(`http://localhost:4000/users/${userId}`)
+      const res = await axios.delete(`http://localhost:4000/users/${userId}`)
       fetchUsers()
       setShowDeleteModal(false)
       setSelectedUser(null)
-    } catch (error) {
-      console.error('Failed to delete user:', error)
+    } catch (err: any) {
+      console.error('Failed to delete user:', err)
+      alert(err.response?.data?.error || 'Failed to delete user')
     }
   }
 
