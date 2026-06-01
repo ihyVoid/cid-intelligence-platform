@@ -9,13 +9,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "^11.3.0",
-      "onFail": "download"
-    }
-  },
+  
   "type": "module",
   "dependencies": {
     "@fastify/cors": "^11.2.0",
