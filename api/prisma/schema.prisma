@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  role      String   @default("agent")
+  createdAt DateTime @default(now())
+}
+model Case {
+
+  id                String   @id @default(cuid())
+
+  caseNumber        String   @unique
+
+  title             String
+  description       String
+
+  type              String
+  status            String
+
+  classification    String
+  priority          String
+
+  createdBy         String
+  createdAt         DateTime @default(now())
+
+  evidences         Evidence[]
+  suspects          Suspect[]
+  timeline          TimelineEvent[]
+  logs              InvestigationLog[]
+
+  relationships    Relationship[]
+}
+
+model Board {
+
+  id            String @id @default(cuid())
+
+  title         String
+
+  description   String?
+
+  classification String @default("CONFIDENTIAL")
+
+  ownerId       String
+
+  createdAt     DateTime @default(now())
+
+  nodes         GraphNode[]
+
+  edges         GraphEdge[]
+}
+
+model Evidence {
+
+  id                String   @id @default(cuid())
+
+  caseId            String
+
+  title             String
+  description       String
+
+  evidenceType      String
+
+  classification    String
+
+  imageUrl          String?
+
+  fileUrl           String?
+
+  createdBy         String
+
+  createdAt         DateTime @default(now())
+
+  case              Case @relation(fields: [caseId], references: [id])
+
+}
+
+model Suspect {
+
+  id                String   @id @default(cuid())
+
+  caseId            String
+
+  fullName          String
+
+  threatLevel       String
+
+  status            String
+
+  description       String
+
+  imageUrl          String?
+
+  createdAt         DateTime @default(now())
+
+  case              Case @relation(fields: [caseId], references: [id])
+
+}
+
+model Relationship {
+  id            String   @id @default(uuid())
+
+  sourceId      String
+  sourceType    String
+
+  targetId      String
+  targetType    String
+
+  label         String
+
+  caseId        String
+  case          Case @relation(fields: [caseId], references: [id])
+
+  createdAt     DateTime @default(now())
+}
+
+model TimelineEvent {
+
+  id                String   @id @default(cuid())
+
+  caseId            String
+
+  title             String
+  description       String
+
+  eventTime         String
+
+  createdAt         DateTime @default(now())
+
+  case              Case @relation(fields: [caseId], references: [id])
+
+}
+
+model InvestigationLog {
+
+  id                String   @id @default(cuid())
+
+  caseId            String
+
+  message           String
+
+  createdBy         String
+
+  createdAt         DateTime @default(now())
+
+  case              Case @relation(fields: [caseId], references: [id])
+
+}
+
+model GraphNode {
+
+  id            String @id @default(cuid())
+
+  boardId       String
+
+  board         Board @relation(fields: [boardId], references: [id])
+
+  nodeType      String
+
+  title         String
+
+  subtitle      String?
+
+  classification String @default("CONFIDENTIAL")
+
+  x             Float
+  y             Float
+
+  metadata      String?
+
+  createdBy     String?
+
+  createdAt     DateTime @default(now())
+
+}
+
+model GraphEdge {
+
+  id            String @id @default(cuid())
+
+  boardId       String
+
+  board         Board @relation(fields: [boardId], references: [id])
+
+  source        String
+  target        String
+
+  label         String?
+
+  animated      Boolean @default(true)
+
+  createdAt     DateTime @default(now())
+
+}
