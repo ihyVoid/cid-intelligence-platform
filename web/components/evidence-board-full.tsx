@@ -7,24 +7,19 @@ import ReactFlow, {
   MiniMap,
   Handle,
   Position,
-  addEdge,
   Node,
   Edge,
   Connection,
-  useNodesState,
-  useEdgesState,
   MarkerType,
   BackgroundVariant,
   NodeChange,
-  EdgeChange,
   ReactFlowInstance
 } from 'reactflow'
 import 'reactflow/dist/style.css'
-import { Plus, Trash2, Link2, Save, X, Users, FileText, MapPin, Zap, Search, Edit3 } from 'lucide-react'
+import { Plus, Trash2, Save, X, Users, FileText, MapPin, Zap, Search, Edit3, Loader2 } from 'lucide-react'
+import axios from 'axios'
 
-/* =========================
-   NODE TYPES
-========================= */
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 const nodeTypeIcons = {
   person: Users,
@@ -34,10 +29,10 @@ const nodeTypeIcons = {
 }
 
 const nodeTypeColors = {
-  person: { bg: 'from-blue-500 to-blue-700', text: 'text-blue-400', border: 'border-blue-500/30' },
-  location: { bg: 'from-green-500 to-green-700', text: 'text-green-400', border: 'border-green-500/30' },
-  document: { bg: 'from-yellow-500 to-yellow-700', text: 'text-yellow-400', border: 'border-yellow-500/30' },
-  event: { bg: 'from-purple-500 to-purple-700', text: 'text-purple-400', border: 'border-purple-500/30' }
+  person: { bg: 'from-blue-500 to-blue-700', text: 'text-blue-400' },
+  location: { bg: 'from-green-500 to-green-700', text: 'text-green-400' },
+  document: { bg: 'from-yellow-500 to-yellow-700', text: 'text-yellow-400' },
+  event: { bg: 'from-purple-500 to-purple-700', text: 'text-purple-400' }
 }
 
 function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
@@ -62,11 +57,7 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
         />
         
         <div className='flex items-start gap-3'>
-          <div className={`
-            w-12 h-12 rounded-xl flex items-center justify-center
-            bg-gradient-to-br ${colors.bg}
-            shadow-lg
-          `}>
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${colors.bg} shadow-lg`}>
             <Icon className='w-6 h-6 text-white' />
           </div>
           <div className='flex-1 min-w-0'>
@@ -77,8 +68,7 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
           </div>
         </div>
 
-        {/* Connection indicator */}
-        <div className={`absolute -right-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center`}>
+        <div className='absolute -right-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
           <div className='w-1.5 h-1.5 bg-white rounded-full' />
         </div>
       </div>
@@ -97,60 +87,106 @@ const nodeTypes = {
   evidenceNode: EvidenceNode
 }
 
-/* =========================
-   SAMPLE DATA
-========================= */
-
-const initialNodes: Node[] = [
-  { id: '1', type: 'evidenceNode', position: { x: 300, y: 50 }, data: { label: 'Michael Chen', nodeType: 'person' } },
-  { id: '2', type: 'evidenceNode', position: { x: 100, y: 200 }, data: { label: 'Downtown Warehouse', nodeType: 'location' } },
-  { id: '3', type: 'evidenceNode', position: { x: 500, y: 200 }, data: { label: 'Shipping Manifest', nodeType: 'document' } },
-  { id: '4', type: 'evidenceNode', position: { x: 200, y: 380 }, data: { label: 'Arms Deal - Feb 15', nodeType: 'event' } },
-  { id: '5', type: 'evidenceNode', position: { x: 450, y: 380 }, data: { label: 'Offshore Account', nodeType: 'document' } },
-  { id: '6', type: 'evidenceNode', position: { x: 300, y: 520 }, data: { label: 'Dark Web Forum', nodeType: 'location' } },
-]
-
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2', animated: true, label: 'visited', markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' }, style: { stroke: '#6366f1', strokeWidth: 2 } },
-  { id: 'e1-3', source: '1', target: '3', animated: false, label: 'signed', markerEnd: { type: MarkerType.ArrowClosed, color: '#22c55e' }, style: { stroke: '#22c55e', strokeWidth: 2 } },
-  { id: 'e2-4', source: '2', target: '4', animated: true, label: 'hosted', markerEnd: { type: MarkerType.ArrowClosed, color: '#f59e0b' }, style: { stroke: '#f59e0b', strokeWidth: 2 } },
-  { id: 'e3-5', source: '3', target: '5', animated: true, label: 'contains', markerEnd: { type: MarkerType.ArrowClosed, color: '#8b5cf6' }, style: { stroke: '#8b5cf6', strokeWidth: 2 } },
-  { id: 'e4-6', source: '4', target: '6', animated: true, label: 'connected via', markerEnd: { type: MarkerType.ArrowClosed, color: '#ef4444' }, style: { stroke: '#ef4444', strokeWidth: 2 } },
-  { id: 'e5-6', source: '5', target: '6', animated: true, label: 'funds transfer', markerEnd: { type: MarkerType.ArrowClosed, color: '#06b6d4' }, style: { stroke: '#06b6d4', strokeWidth: 2 } },
-  { id: 'e1-4', source: '1', target: '4', animated: true, label: 'organized', markerEnd: { type: MarkerType.ArrowClosed, color: '#ec4899' }, style: { stroke: '#ec4899', strokeWidth: 2 } },
-]
-
-/* =========================
-   COMPONENT
-========================= */
-
 interface EvidenceBoardFullProps {
   boardId?: string
 }
 
 export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  const [nodes, setNodes] = useState<Node[]>([])
+  const [edges, setEdges] = useState<Edge[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [newNodeLabel, setNewNodeLabel] = useState('')
   const [newNodeType, setNewNodeType] = useState('person')
-  const [connectionLabel, setConnectionLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
 
-  // Auto-save indicator
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLastSaved(new Date())
-    }, 30000)
-    return () => clearInterval(interval)
+    loadGraphData()
+  }, [boardId])
+
+  const loadGraphData = async () => {
+    if (!boardId) return
+    setLoading(true)
+    try {
+      const response = await axios.get(`${API_URL}/graph/${boardId}`)
+      setNodes(response.data.nodes || [])
+      setEdges(response.data.edges || [])
+    } catch (error) {
+      console.error('Error loading graph:', error)
+      setNodes([])
+      setEdges([])
+    }
+    setLoading(false)
+  }
+
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setNodes(prev => {
+      const newNodes = [...prev]
+      changes.forEach(change => {
+        if (change.type === 'position' && change.position) {
+          const idx = newNodes.findIndex(n => n.id === change.id)
+          if (idx !== -1) {
+            newNodes[idx] = { ...newNodes[idx], position: change.position }
+            if (!change.dragging) {
+              saveNodePosition(change.id, change.position)
+            }
+          }
+        }
+      })
+      return newNodes
+    })
   }, [])
 
-  // Handle node selection
+  const onEdgesChange = useCallback((changes: any[]) => {
+    setEdges(prev => {
+      const newEdges = [...prev]
+      changes.forEach(change => {
+        if (change.type === 'remove') {
+          const idx = newEdges.findIndex(e => e.id === change.id)
+          if (idx !== -1) newEdges.splice(idx, 1)
+        }
+      })
+      return newEdges
+    })
+  }, [])
+
+  const saveNodePosition = async (nodeId: string, position: { x: number; y: number }) => {
+    try {
+      await axios.put(`${API_URL}/graph/node/${nodeId}`, { x: position.x, y: position.y })
+    } catch (error) {
+      console.error('Error saving position:', error)
+    }
+  }
+
+  const onConnect = useCallback(async (params: Connection) => {
+    if (!params.source || !params.target) return
+    try {
+      const response = await axios.post(`${API_URL}/graph/edge`, {
+        boardId,
+        source: params.source,
+        target: params.target,
+        label: 'connected',
+        animated: true
+      })
+      setEdges(prev => [...prev, {
+        id: response.data.id,
+        source: params.source,
+        target: params.target,
+        animated: true,
+        label: 'connected',
+        style: { stroke: '#6366f1', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed }
+      }])
+      setLastSaved(new Date())
+    } catch (error) {
+      console.error('Error creating edge:', error)
+    }
+  }, [boardId])
+
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.id)
   }, [])
@@ -159,106 +195,108 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
     setSelectedNode(null)
   }, [])
 
-  // Handle connections between nodes
-  const onConnect = useCallback((params: Connection) => {
-    if (!params.source || !params.target) return
-    
-    let label = connectionLabel || 'connected'
-    if (!label.trim()) {
-      label = 'linked'
-    }
-    
-    const newEdge: Edge = {
-      id: `e${params.source}-${params.target}-${Date.now()}`,
-      source: params.source,
-      target: params.target,
-      animated: true,
-      label,
-      markerEnd: { type: MarkerType.ArrowClosed },
-      style: { stroke: '#6366f1', strokeWidth: 2 }
-    }
-    
-    setEdges((eds) => [...eds, newEdge])
-    setConnectionLabel('')
-    setLastSaved(new Date())
-  }, [setEdges, connectionLabel])
-
-  // Handle position changes (drag and drop)
-  const onNodeDragStop = useCallback((event: React.MouseEvent, node: Node, nodes: Node[]) => {
-    setLastSaved(new Date())
-  }, [])
-
-  // Add new node
-  const addNode = () => {
+  const addNode = async () => {
     if (!newNodeLabel.trim()) return
-    
     const position = reactFlowInstance 
       ? reactFlowInstance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
-      : { x: 250, y: 250 }
+      : { x: 250 + Math.random() * 100, y: 250 + Math.random() * 100 }
     
-    const newNode: Node = {
-      id: `node-${Date.now()}`,
-      type: 'evidenceNode',
-      position,
-      data: { label: newNodeLabel, nodeType: newNodeType }
+    try {
+      const response = await axios.post(`${API_URL}/graph/node`, {
+        boardId,
+        nodeType: newNodeType,
+        title: newNodeLabel,
+        x: position.x,
+        y: position.y
+      })
+      setNodes(prev => [...prev, {
+        id: response.data.id,
+        type: 'evidenceNode',
+        position: { x: response.data.position.x, y: response.data.position.y },
+        data: response.data.data
+      }])
+      setNewNodeLabel('')
+      setShowAddModal(false)
+      setSelectedNode(response.data.id)
+      setLastSaved(new Date())
+    } catch (error) {
+      console.error('Error creating node:', error)
     }
-    
-    setNodes((nds) => [...nds, newNode])
-    setNewNodeLabel('')
-    setShowAddModal(false)
-    setSelectedNode(newNode.id)
-    setLastSaved(new Date())
   }
 
-  // Delete node
-  const deleteNode = useCallback((nodeId: string) => {
-    setNodes((nds) => nds.filter(n => n.id !== nodeId))
-    setEdges((eds) => eds.filter(e => e.source !== nodeId && e.target !== nodeId))
-    setSelectedNode(null)
-    setLastSaved(new Date())
-  }, [setNodes, setEdges])
-
-  // Delete edge
-  const deleteEdge = useCallback((edgeId: string) => {
-    setEdges((eds) => eds.filter(e => e.id !== edgeId))
-    setLastSaved(new Date())
-  }, [setEdges])
-
-  // Update node label
-  const updateNodeLabel = useCallback((nodeId: string, label: string) => {
-    setNodes((nds) => nds.map(n => 
-      n.id === nodeId ? { ...n, data: { ...n.data, label } } : n
-    ))
-    setLastSaved(new Date())
-  }, [setNodes])
-
-  // Update node type
-  const updateNodeType = useCallback((nodeId: string, nodeType: string) => {
-    setNodes((nds) => nds.map(n => 
-      n.id === nodeId ? { ...n, data: { ...n.data, nodeType } } : n
-    ))
-    setLastSaved(new Date())
-  }, [setNodes])
-
-  // Update connection label
-  const updateEdgeLabel = useCallback((edgeId: string, label: string) => {
-    setEdges((eds) => eds.map(e => 
-      e.id === edgeId ? { ...e, label } : e
-    ))
-    setLastSaved(new Date())
-  }, [setEdges])
-
-  // Manual save
-  const handleSave = useCallback(() => {
-    setIsSaving(true)
-    setTimeout(() => {
-      setIsSaving(false)
+  const deleteNode = useCallback(async (nodeId: string) => {
+    try {
+      await axios.delete(`${API_URL}/graph/node/${nodeId}`)
+      setNodes(prev => prev.filter(n => n.id !== nodeId))
+      setEdges(prev => prev.filter(e => e.source !== nodeId && e.target !== nodeId))
+      setSelectedNode(null)
       setLastSaved(new Date())
-    }, 1000)
+    } catch (error) {
+      console.error('Error deleting node:', error)
+    }
   }, [])
 
-  // Get selected node data
+  const deleteEdge = useCallback(async (edgeId: string) => {
+    try {
+      await axios.delete(`${API_URL}/graph/edge/${edgeId}`)
+      setEdges(prev => prev.filter(e => e.id !== edgeId))
+      setLastSaved(new Date())
+    } catch (error) {
+      console.error('Error deleting edge:', error)
+    }
+  }, [])
+
+  const updateNodeLabel = useCallback(async (nodeId: string, label: string) => {
+    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, label } } : n))
+    try {
+      await axios.put(`${API_URL}/graph/node/${nodeId}`, { title: label })
+      setLastSaved(new Date())
+    } catch (error) {
+      console.error('Error updating node:', error)
+    }
+  }, [])
+
+  const updateNodeType = useCallback(async (nodeId: string, nodeType: string) => {
+    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, data: { ...n.data, nodeType } } : n))
+    try {
+      await axios.put(`${API_URL}/graph/node/${nodeId}`, { nodeType })
+      setLastSaved(new Date())
+    } catch (error) {
+      console.error('Error updating node type:', error)
+    }
+  }, [])
+
+  const updateEdgeLabel = useCallback(async (edgeId: string, label: string) => {
+    setEdges(prev => prev.map(e => e.id === edgeId ? { ...e, label } : e))
+    try {
+      await axios.put(`${API_URL}/graph/edge/${edgeId}`, { label })
+      setLastSaved(new Date())
+    } catch (error) {
+      console.error('Error updating edge:', error)
+    }
+  }, [])
+
+  const handleSave = useCallback(async () => {
+    setIsSaving(true)
+    await Promise.all(nodes.map(n => 
+      axios.put(`${API_URL}/graph/node/${n.id}`, { x: n.position.x, y: n.position.y }).catch(() => {})
+    ))
+    setLastSaved(new Date())
+    setTimeout(() => setIsSaving(false), 1000)
+  }, [nodes])
+
   const selectedNodeData = nodes.find(n => n.id === selectedNode)
+
+  if (loading) {
+    return (
+      <div className='w-full h-full flex items-center justify-center bg-[#0f0f14]'>
+        <div className='text-center'>
+          <Loader2 className='w-12 h-12 text-red-500 animate-spin mx-auto mb-4' />
+          <p className='text-[#7E8299]'>Loading evidence network...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className='w-full h-full relative' ref={reactFlowWrapper}>
@@ -266,27 +304,15 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
-        onNodesChange={(changes) => {
-          onNodesChange(changes as NodeChange[])
-          changes.forEach(change => {
-            if (change.type === 'position' && change.dragging === false) {
-              setLastSaved(new Date())
-            }
-          })
-        }}
+        onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
-        onNodeDragStop={onNodeDragStop}
         onInit={setReactFlowInstance}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
         className='!bg-[#0f0f14]'
-        defaultEdgeOptions={{
-          animated: true,
-          style: { strokeWidth: 2 }
-        }}
+        defaultEdgeOptions={{ animated: true, style: { strokeWidth: 2 } }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }}
         connectionLineType='bezier'
         connectionRadius={30}
@@ -295,12 +321,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         snapToGrid
         snapGrid={[15, 15]}
       >
-        <Background 
-          color='#2a2a35' 
-          gap={20} 
-          variant={BackgroundVariant.Dots}
-          className='!bg-[#0f0f14]'
-        />
+        <Background color='#2a2a35' gap={20} variant={BackgroundVariant.Dots} className='!bg-[#0f0f14]' />
         <MiniMap 
           nodeColor={(node) => {
             const data = node.data as any
@@ -315,44 +336,30 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
           pannable
           zoomable
         />
-        <Controls 
-          style={{ backgroundColor: '#1a1a22', borderRadius: '12px', border: '1px solid #2a2a35' }}
-        />
+        <Controls style={{ backgroundColor: '#1a1a22', borderRadius: '12px', border: '1px solid #2a2a35' }} />
       </ReactFlow>
 
-      {/* Top Toolbar */}
       <div className='absolute top-4 left-4 right-4 flex items-center justify-between z-50'>
         <div className='relative'>
           <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5a5a6e]' />
           <input
             type='text'
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
             placeholder='Search nodes...'
             className='w-64 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl pl-10 pr-4 py-2 text-white text-sm outline-none focus:border-[#3a3a45] transition-colors'
           />
         </div>
-
         <div className='flex items-center gap-2 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-2xl p-2 shadow-xl shadow-black/50'>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className='flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-xl text-white text-sm font-medium transition-all shadow-lg shadow-red-500/30'
-          >
-            <Plus className='w-4 h-4' />
-            Add Node
+          <button onClick={() => setShowAddModal(true)} className='flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-xl text-white text-sm font-medium transition-all shadow-lg shadow-red-500/30'>
+            <Plus className='w-4 h-4' />Add Node
           </button>
           <div className='w-px h-6 bg-[#2a2a35]' />
-          <button
-            onClick={handleSave}
-            className='flex items-center gap-2 px-4 py-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-[#B7B7B7] hover:text-white text-sm font-medium transition-all'
-          >
+          <button onClick={handleSave} className='flex items-center gap-2 px-4 py-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-[#B7B7B7] hover:text-white text-sm font-medium transition-all'>
             <Save className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
             {isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
 
-      {/* Selected Node Panel */}
       {selectedNode && selectedNodeData && (
         <div className='absolute right-4 top-20 w-80 bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl shadow-2xl shadow-black/50 overflow-hidden z-50'>
           <div className='p-4 border-b border-[#2a2a35] flex items-center justify-between'>
@@ -364,7 +371,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
               <X className='w-5 h-5' />
             </button>
           </div>
-          
           <div className='p-4 space-y-4'>
             <div className='space-y-2'>
               <label className='text-[#7E8299] text-xs font-medium uppercase tracking-wider'>Label</label>
@@ -378,7 +384,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                 />
               </div>
             </div>
-
             <div className='space-y-2'>
               <label className='text-[#7E8299] text-xs font-medium uppercase tracking-wider'>Type</label>
               <div className='grid grid-cols-4 gap-2'>
@@ -390,13 +395,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                     <button
                       key={type}
                       onClick={() => updateNodeType(selectedNode, type)}
-                      className={`
-                        p-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all
-                        ${isActive 
-                          ? `border-red-500 bg-red-500/10 ${colors.text}` 
-                          : 'border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'
-                        }
-                      `}
+                      className={`p-2 rounded-xl border flex flex-col items-center gap-1.5 transition-all ${isActive ? `border-red-500 bg-red-500/10 ${colors.text}` : 'border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'}`}
                     >
                       <Icon className='w-5 h-5' />
                       <span className='text-[10px] capitalize'>{type}</span>
@@ -405,16 +404,13 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                 })}
               </div>
             </div>
-
             <div className='space-y-2'>
               <label className='text-[#7E8299] text-xs font-medium uppercase tracking-wider'>
                 Connections ({edges.filter(e => e.source === selectedNode || e.target === selectedNode).length})
               </label>
               <div className='space-y-1 max-h-40 overflow-y-auto'>
                 {edges.filter(e => e.source === selectedNode || e.target === selectedNode).length === 0 ? (
-                  <p className='text-[#5a5a6e] text-xs text-center py-4'>
-                    No connections yet. Drag from this node to another.
-                  </p>
+                  <p className='text-[#5a5a6e] text-xs text-center py-4'>No connections yet. Drag from this node to another.</p>
                 ) : (
                   edges.filter(e => e.source === selectedNode || e.target === selectedNode).map(edge => {
                     const otherId = edge.source === selectedNode ? edge.target : edge.source
@@ -432,10 +428,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                             placeholder='Add label...'
                           />
                         </div>
-                        <button 
-                          onClick={() => deleteEdge(edge.id)}
-                          className='text-[#5a5a6e] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 ml-2'
-                        >
+                        <button onClick={() => deleteEdge(edge.id)} className='text-[#5a5a6e] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 ml-2'>
                           <X className='w-3 h-3' />
                         </button>
                       </div>
@@ -444,28 +437,18 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                 )}
               </div>
             </div>
-
             <div className='flex gap-2 pt-2'>
-              <button 
-                onClick={() => deleteNode(selectedNode)}
-                className='flex-1 py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-xl text-red-400 text-sm font-medium transition-all flex items-center justify-center gap-2'
-              >
-                <Trash2 className='w-4 h-4' />
-                Delete
+              <button onClick={() => deleteNode(selectedNode)} className='flex-1 py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-xl text-red-400 text-sm font-medium transition-all flex items-center justify-center gap-2'>
+                <Trash2 className='w-4 h-4' />Delete
               </button>
-              <button 
-                onClick={handleSave}
-                className='flex-1 py-2.5 px-4 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-white text-sm font-medium transition-all'
-              >
-                <Save className='w-4 h-4 inline mr-2' />
-                Save
+              <button onClick={handleSave} className='flex-1 py-2.5 px-4 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-white text-sm font-medium transition-all'>
+                <Save className='w-4 h-4 inline mr-2' />Save
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Node Modal */}
       {showAddModal && (
         <div className='fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
           <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/50'>
@@ -475,7 +458,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                 <X className='w-6 h-6' />
               </button>
             </div>
-
             <div className='space-y-4'>
               <div>
                 <label className='text-[#7E8299] text-sm font-medium block mb-2'>Label *</label>
@@ -498,13 +480,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                       <button
                         key={type}
                         onClick={() => setNewNodeType(type)}
-                        className={`
-                          p-3 rounded-xl border flex flex-col items-center gap-2 transition-all
-                          ${newNodeType === type 
-                            ? `border-red-500 bg-red-500/10 ${colors.text}` 
-                            : 'border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'
-                          }
-                        `}
+                        className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${newNodeType === type ? `border-red-500 bg-red-500/10 ${colors.text}` : 'border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'}`}
                       >
                         <Icon className='w-5 h-5' />
                         <span className='text-xs capitalize'>{type}</span>
@@ -525,7 +501,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         </div>
       )}
 
-      {/* Stats Bar */}
       <div className='absolute bottom-4 left-4 flex items-center gap-3'>
         <div className='bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2 flex items-center gap-2 shadow-lg shadow-black/30'>
           <div className='w-2 h-2 bg-red-500 rounded-full animate-pulse' />
@@ -539,16 +514,13 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         </div>
         {lastSaved && (
           <div className='bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2 shadow-lg shadow-black/30'>
-            <span className='text-[#7E8299] text-xs'>
-              Saved {lastSaved.toLocaleTimeString()}
-            </span>
+            <span className='text-[#7E8299] text-xs'>Saved {lastSaved.toLocaleTimeString()}</span>
           </div>
         )}
       </div>
 
-      {/* Help */}
       <div className='absolute bottom-4 right-4 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2 shadow-lg shadow-black/30'>
-        <span className='text-[#5a5a6e] text-xs'>💡 Drag from node edge to connect • Click node to edit</span>
+        <span className='text-[#5a5a6e] text-xs'>Drag from node edge to connect | Click node to edit</span>
       </div>
     </div>
   )

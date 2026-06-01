@@ -24,7 +24,7 @@ export default function EvidencePage() {
   const [ready, setReady] = useState(false)
   const [boards, setBoards] = useState<Board[]>([])
   const [loadingBoards, setLoadingBoards] = useState(true)
-  const [selectedBoard, setSelectedBoard] = useState<string>('main-case')
+  const [selectedBoard, setSelectedBoard] = useState<string>('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newBoardName, setNewBoardName] = useState('')
   const [newBoardDesc, setNewBoardDesc] = useState('')
@@ -47,23 +47,28 @@ export default function EvidencePage() {
     try {
       const response = await axios.get(`${API_URL}/boards`)
       setBoards(response.data)
-      
+
       // If no boards, create a default one
       if (response.data.length === 0) {
-        await axios.post(`${API_URL}/boards`, {
+        const newBoard = await axios.post(`${API_URL}/boards`, {
           name: 'Main Investigation',
           description: 'Primary case evidence network'
         })
+        setSelectedBoard(newBoard.data.id)
         loadBoards()
+      } else {
+        // Set selectedBoard to first board's ID if still using default
+        setSelectedBoard(response.data[0].id)
       }
     } catch (error) {
       console.error('Error loading boards:', error)
       // Create default board on error
       try {
-        await axios.post(`${API_URL}/boards`, {
+        const newBoard = await axios.post(`${API_URL}/boards`, {
           name: 'Main Investigation',
           description: 'Primary case evidence network'
         })
+        setSelectedBoard(newBoard.data.id)
         loadBoards()
       } catch (e) {
         console.error('Error creating default board:', e)
@@ -114,7 +119,8 @@ export default function EvidencePage() {
       await axios.delete(`${API_URL}/boards/${boardId}`)
       setBoards(boards.filter(b => b.id !== boardId))
       if (selectedBoard === boardId) {
-        setSelectedBoard(boards.length > 1 ? boards.find(b => b.id !== boardId)?.id || 'main-case' : 'main-case')
+        const remaining = boards.filter(b => b.id !== boardId)
+        setSelectedBoard(remaining.length > 0 ? remaining[0].id : '')
       }
     } catch (error) {
       console.error('Error deleting board:', error)
@@ -220,9 +226,11 @@ export default function EvidencePage() {
               </div>
 
               {/* Evidence Board */}
-              <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: 'calc(100vh - 320px)' }}>
-                {selectedBoard && <EvidenceBoardFull key={selectedBoard} boardId={selectedBoard} />}
-              </div>
+              {selectedBoard && (
+                <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: 'calc(100vh - 320px)' }}>
+                  <EvidenceBoardFull key={selectedBoard} boardId={selectedBoard} />
+                </div>
+              )}
             </>
           )}
 
