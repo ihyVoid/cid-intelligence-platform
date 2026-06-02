@@ -225,10 +225,12 @@ export default function EvidencePage() {
                 ))}
               </div>
 
-              {/* Evidence Board - Fixed Size */}
+              {/* Evidence Board - Fixed Size with explicit container */}
               {selectedBoard && (
-                <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: '500px', width: '100%' }}>
-                  <EvidenceBoardFull key={selectedBoard} boardId={selectedBoard} />
+                <div className='relative' style={{ height: '500px', width: '100%', minWidth: '300px' }}>
+                  <div className='absolute inset-0 bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden'>
+                    <EvidenceBoardFull key={selectedBoard} boardId={selectedBoard} />
+                  </div>
                 </div>
               )}
             </>

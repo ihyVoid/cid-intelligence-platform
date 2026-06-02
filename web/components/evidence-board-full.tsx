@@ -364,7 +364,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
   }
 
   return (
-    <div className='w-full h-full relative' ref={reactFlowWrapper}>
+    <div style={{ width: '100%', height: '100%' }} className='relative' ref={reactFlowWrapper}>
       <ReactFlow
         nodes={filteredNodes}
         edges={edges || []}
