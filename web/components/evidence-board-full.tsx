@@ -41,37 +41,38 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
   const colors = nodeTypeColors[data?.nodeType as keyof typeof nodeTypeColors] || nodeTypeColors.document
   
   return (
-    <div className={`relative group ${selected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-[#0f0f14]' : ''}`}>
-      <div className={`
-        bg-gradient-to-br from-[#1a1a22] to-[#25252f] 
-        border-2 rounded-2xl p-4 min-w-[200px] 
-        shadow-xl shadow-black/30 
-        transition-all duration-300 
-        group-hover:scale-105 group-hover:shadow-red-500/10
-        ${selected ? 'border-red-500' : 'border-[#3a3a45] group-hover:border-red-500/50'}
-      `}>
-        <Handle 
-          type='target' 
-          position={Position.Top} 
-          className='!w-3 !h-3 !bg-red-500 !border-2 !border-[#1a1a22] !-top-1.5 !opacity-0 group-hover:!opacity-100 transition-opacity' 
-          isConnectable={true}
-        />
-        
-        <div className='flex items-start gap-3'>
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${colors.bg} shadow-lg`}>
-            <Icon className='w-6 h-6 text-white' />
-          </div>
-          <div className='flex-1 min-w-0'>
-            <p className='text-white font-semibold text-sm leading-tight line-clamp-2'>{data?.label || 'Untitled'}</p>
-            <span className={`${colors.text} text-[10px] uppercase tracking-wider mt-1 block font-medium`}>
-              {data?.nodeType || 'unknown'}
-            </span>
-          </div>
+    <div 
+      className={`relative group ${selected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-[#0f0f14]' : ''}`}
+      style={{ 
+        background: '#2a2a35',
+        border: selected ? '3px solid red' : '2px solid #4a4a55',
+        borderRadius: '16px',
+        padding: '16px',
+        minWidth: '200px',
+        zIndex: 10
+      }}
+    >
+      <Handle 
+        type='target' 
+        position={Position.Top} 
+        className='!w-3 !h-3 !bg-red-500 !border-2 !border-[#1a1a22] !-top-1.5 !opacity-0 group-hover:!opacity-100 transition-opacity' 
+        isConnectable={true}
+      />
+      
+      <div className='flex items-start gap-3'>
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${colors.bg} shadow-lg`}>
+          <Icon className='w-6 h-6 text-white' />
         </div>
+        <div className='flex-1 min-w-0'>
+          <p className='text-white font-semibold text-sm leading-tight line-clamp-2'>{data?.label || 'Untitled'}</p>
+          <span className={`${colors.text} text-[10px] uppercase tracking-wider mt-1 block font-medium`}>
+            {data?.nodeType || 'unknown'}
+          </span>
+        </div>
+      </div>
 
-        <div className='absolute -right-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
-          <div className='w-1.5 h-1.5 bg-white rounded-full' />
-        </div>
+      <div className='absolute -right-1 top-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center'>
+        <div className='w-1.5 h-1.5 bg-white rounded-full' />
       </div>
       
       <Handle 
