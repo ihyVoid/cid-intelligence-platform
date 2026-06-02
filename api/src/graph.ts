@@ -121,6 +121,11 @@ export async function graphRoutes(app: FastifyInstance) {
       where: { boardId: actualBoardId }
     })
     
+    console.log('[API] Returning nodes:', nodes.length)
+    nodes.forEach((node, i) => {
+      console.log(`  Node ${i+1}: id=${node.id}, title=${node.title}, pos=(${node.x}, ${node.y}), type=${node.nodeType}`)
+    })
+    
     // Convert to React Flow format
     const reactNodes = nodes.map(node => ({
       id: node.id,

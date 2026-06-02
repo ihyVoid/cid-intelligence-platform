@@ -36,8 +36,8 @@ const nodeTypeColors = {
 }
 
 function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
-  const Icon = nodeTypeIcons[data.nodeType as keyof typeof nodeTypeIcons] || FileText
-  const colors = nodeTypeColors[data.nodeType as keyof typeof nodeTypeColors] || nodeTypeColors.document
+  const Icon = nodeTypeIcons[data?.nodeType as keyof typeof nodeTypeIcons] || FileText
+  const colors = nodeTypeColors[data?.nodeType as keyof typeof nodeTypeColors] || nodeTypeColors.document
   
   return (
     <div className={`relative group ${selected ? 'ring-2 ring-red-500 ring-offset-2 ring-offset-[#0f0f14]' : ''}`}>
@@ -61,9 +61,9 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
             <Icon className='w-6 h-6 text-white' />
           </div>
           <div className='flex-1 min-w-0'>
-            <p className='text-white font-semibold text-sm leading-tight line-clamp-2'>{data.label}</p>
+            <p className='text-white font-semibold text-sm leading-tight line-clamp-2'>{data?.label || 'Untitled'}</p>
             <span className={`${colors.text} text-[10px] uppercase tracking-wider mt-1 block font-medium`}>
-              {data.nodeType}
+              {data?.nodeType || 'unknown'}
             </span>
           </div>
         </div>
@@ -83,6 +83,7 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
   )
 }
 
+// Move nodeTypes outside component to avoid React Flow warning
 const nodeTypes = {
   evidenceNode: EvidenceNode
 }
@@ -126,16 +127,22 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
       
       // Ensure proper node format for React Flow
       const formattedNodes = (response.data.nodes || []).map((node: any, idx: number) => ({
-        id: node.id,
-        type: node.type || 'evidenceNode',
+        id: node.id || `node-${idx}`,
+        type: 'evidenceNode',
         position: {
           x: node.position?.x ?? (100 + idx * 150),
           y: node.position?.y ?? (100 + idx * 80)
         },
-        data: node.data || { label: node.title || 'Untitled', nodeType: node.nodeType || 'person' }
+        data: {
+          label: node.data?.label || node.title || `Node ${idx + 1}`,
+          nodeType: node.data?.nodeType || node.nodeType || 'person',
+          subtitle: node.data?.subtitle || '',
+          classification: node.data?.classification || 'CONFIDENTIAL'
+        }
       }))
       
-      console.log('Loading graph data:', { nodeCount: formattedNodes.length, boardId })
+      console.log('[EvidenceBoard] Loaded nodes:', formattedNodes.length)
+      console.log('[EvidenceBoard] First node:', JSON.stringify(formattedNodes[0], null, 2))
       setNodes(formattedNodes)
       setEdges(response.data.edges || [])
     } catch (error) {
