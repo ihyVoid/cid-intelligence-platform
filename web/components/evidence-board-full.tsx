@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState, useRef, useMemo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -13,7 +13,8 @@ import ReactFlow, {
   MarkerType,
   BackgroundVariant,
   NodeChange,
-  ReactFlowInstance
+  ReactFlowInstance,
+  NodeTypes
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { Plus, Trash2, Save, X, Users, FileText, MapPin, Zap, Search, Edit3, Loader2 } from 'lucide-react'
@@ -83,8 +84,8 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
   )
 }
 
-// Move nodeTypes outside component to avoid React Flow warning
-const nodeTypes = {
+// Define nodeTypes OUTSIDE component to prevent React Flow warning
+const nodeTypes: NodeTypes = {
   evidenceNode: EvidenceNode
 }
 
