@@ -108,20 +108,34 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
     loadGraphData()
   }, [boardId])
 
+  // Fit view when nodes are loaded
+  useEffect(() => {
+    if (!loading && nodes.length > 0 && reactFlowInstance) {
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300 })
+      }, 100)
+    }
+  }, [loading, nodes.length, reactFlowInstance])
+
   const loadGraphData = async () => {
     if (!boardId) return
     setLoading(true)
     try {
       const response = await axios.get(`${API_URL}/graph/${boardId}`)
-      // Normalize node positions to fit viewport
-      const normalizedNodes = (response.data.nodes || []).map((node: any) => ({
-        ...node,
+      
+      // Ensure proper node format for React Flow
+      const formattedNodes = (response.data.nodes || []).map((node: any, idx: number) => ({
+        id: node.id,
+        type: node.type || 'evidenceNode',
         position: {
-          x: Math.max(100, Math.min(node.position?.x || 400, 1200)),
-          y: Math.max(100, Math.min(node.position?.y || 300, 800))
-        }
+          x: node.position?.x ?? (100 + idx * 150),
+          y: node.position?.y ?? (100 + idx * 80)
+        },
+        data: node.data || { label: node.title || 'Untitled', nodeType: node.nodeType || 'person' }
       }))
-      setNodes(normalizedNodes)
+      
+      console.log('Loading graph data:', { nodeCount: formattedNodes.length, boardId })
+      setNodes(formattedNodes)
       setEdges(response.data.edges || [])
     } catch (error) {
       console.error('Error loading graph:', error)
@@ -219,14 +233,20 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         y: centerY
       })
       
+      // Format node properly for React Flow
       const newNode = {
         id: response.data.id,
         type: 'evidenceNode',
         position: { 
-          x: Math.max(100, Math.min(response.data.position?.x || centerX, 1200)), 
-          y: Math.max(100, Math.min(response.data.position?.y || centerY, 800))
+          x: response.data.position?.x || centerX, 
+          y: response.data.position?.y || centerY
         },
-        data: response.data.data
+        data: {
+          label: response.data.title || newNodeLabel,
+          nodeType: newNodeType,
+          subtitle: '',
+          classification: 'CONFIDENTIAL'
+        }
       }
       
       setNodes(prev => [...prev, newNode])
@@ -324,17 +344,20 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         onConnect={onConnect}
         onNodeClick={onNodeClick}
         onPaneClick={onPaneClick}
-        onInit={setReactFlowInstance}
-        fitView={nodes.length > 0}
+        onInit={(instance) => {
+          setReactFlowInstance(instance)
+          // Fit view to show all nodes on initial load
+          setTimeout(() => instance.fitView({ padding: 0.3, duration: 300 }), 100)
+        }}
+        fitView
         fitViewOptions={{ padding: 0.3 }}
         className='!bg-[#0f0f14]'
         defaultEdgeOptions={{ animated: true, style: { strokeWidth: 2 } }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }}
         connectionLineType='bezier'
         connectionRadius={30}
-        minZoom={0.5}
-        maxZoom={1.5}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+        minZoom={0.3}
+        maxZoom={2}
         snapToGrid
         snapGrid={[15, 15]}
       >
