@@ -102,6 +102,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -322,6 +323,27 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
 
   const selectedNodeData = nodes.find(n => n.id === selectedNode)
 
+  // Filter nodes based on search query
+  const filteredNodes = searchQuery.trim()
+    ? nodes.filter(n => {
+        const label = n.data?.label?.toLowerCase() || ''
+        const nodeType = n.data?.nodeType?.toLowerCase() || ''
+        const search = searchQuery.toLowerCase()
+        return label.includes(search) || nodeType.includes(search)
+      })
+    : nodes
+
+  // Focus on searched node
+  useEffect(() => {
+    if (searchQuery.trim() && filteredNodes.length === 1 && reactFlowInstance) {
+      const node = filteredNodes[0]
+      setSelectedNode(node.id)
+      setTimeout(() => {
+        reactFlowInstance.setCenter(node.position.x + 100, node.position.y + 100, { zoom: 1.5, duration: 500 })
+      }, 100)
+    }
+  }, [searchQuery, filteredNodes.length, reactFlowInstance])
+
   if (loading) {
     return (
       <div className='w-full h-full flex items-center justify-center bg-[#0f0f14]'>
@@ -336,7 +358,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
   return (
     <div className='w-full h-full relative' ref={reactFlowWrapper}>
       <ReactFlow
-        nodes={nodes || []}
+        nodes={filteredNodes}
         edges={edges || []}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
@@ -384,10 +406,42 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
           <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5a5a6e]' />
           <input
             type='text'
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder='Search nodes...'
-            className='w-64 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl pl-10 pr-4 py-2 text-white text-sm outline-none focus:border-[#3a3a45] transition-colors'
+            className='w-64 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl pl-10 pr-8 py-2 text-white text-sm outline-none focus:border-red-500/50 transition-colors'
           />
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className='absolute right-3 top-1/2 -translate-y-1/2 text-[#5a5a6e] hover:text-white'
+            >
+              <X className='w-4 h-4' />
+            </button>
+          )}
         </div>
+        {searchQuery.trim() && (
+          <div className='absolute top-full left-0 mt-2 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl shadow-lg overflow-hidden z-50 w-72'>
+            <div className='p-2 text-xs text-[#5a5a6e] border-b border-[#2a2a35]'>
+              {filteredNodes.length} result{filteredNodes.length !== 1 ? 's' : ''}
+            </div>
+            <div className='max-h-48 overflow-y-auto'>
+              {filteredNodes.map(node => (
+                <button
+                  key={node.id}
+                  onClick={() => {
+                    setSelectedNode(node.id)
+                    reactFlowInstance?.setCenter(node.position.x + 100, node.position.y + 100, { zoom: 1.5 })
+                  }}
+                  className='w-full px-3 py-2 text-left hover:bg-[#2a2a35] transition-colors flex items-center gap-2'
+                >
+                  <span className={`w-2 h-2 rounded-full ${node.data?.nodeType === 'person' ? 'bg-blue-500' : node.data?.nodeType === 'location' ? 'bg-green-500' : node.data?.nodeType === 'event' ? 'bg-purple-500' : 'bg-yellow-500'}`} />
+                  <span className='text-white text-sm truncate'>{node.data?.label || 'Untitled'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className='flex items-center gap-2 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-2xl p-2 shadow-xl shadow-black/50'>
           <button onClick={() => setShowAddModal(true)} className='flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 rounded-xl text-white text-sm font-medium transition-all shadow-lg shadow-red-500/30'>
             <Plus className='w-4 h-4' />Add Node

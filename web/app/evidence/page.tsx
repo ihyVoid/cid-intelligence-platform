@@ -225,9 +225,9 @@ export default function EvidencePage() {
                 ))}
               </div>
 
-              {/* Evidence Board */}
+              {/* Evidence Board - Compact View */}
               {selectedBoard && (
-                <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: 'calc(100vh - 320px)' }}>
+                <div className='bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden' style={{ height: '500px' }}>
                   <EvidenceBoardFull key={selectedBoard} boardId={selectedBoard} />
                 </div>
               )}
