@@ -149,8 +149,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         }
       }))
       
-      console.log('[EvidenceBoard] Loaded nodes:', formattedNodes.length)
-      console.log('[EvidenceBoard] First node:', JSON.stringify(formattedNodes[0], null, 2))
       setNodes(formattedNodes)
       setEdges(response.data.edges || [])
     } catch (error) {
