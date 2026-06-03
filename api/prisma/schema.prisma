@@ -6,6 +6,7 @@ datasource db {
   provider = "sqlite"
   url      = "file:./dev.db"
 }
+
 model User {
   id        String   @id @default(uuid())
   username  String   @unique
@@ -13,190 +14,255 @@ model User {
   role      String   @default("agent")
   createdAt DateTime @default(now())
 }
+
 model Case {
-
   id                String   @id @default(cuid())
-
   caseNumber        String   @unique
-
   title             String
   description       String
-
   type              String
   status            String
-
   classification    String
   priority          String
-
   createdBy         String
   createdAt         DateTime @default(now())
-
   evidences         Evidence[]
   suspects          Suspect[]
   timeline          TimelineEvent[]
   logs              InvestigationLog[]
-
   relationships    Relationship[]
 }
 
 model Board {
-
   id            String @id @default(cuid())
-
   title         String
-
   description   String?
-
   classification String @default("CONFIDENTIAL")
-
   ownerId       String
-
   createdAt     DateTime @default(now())
-
   nodes         GraphNode[]
-
   edges         GraphEdge[]
 }
 
+// ============ EVIDENCE MODELS ============
+
 model Evidence {
-
   id                String   @id @default(cuid())
-
   caseId            String
-
+  case              Case @relation(fields: [caseId], references: [id])
   title             String
   description       String
-
   evidenceType      String
-
   classification    String
-
-  imageUrl          String?
-
-  fileUrl           String?
-
   createdBy         String
-
   createdAt         DateTime @default(now())
-
-  case              Case @relation(fields: [caseId], references: [id])
-
+  updatedAt         DateTime @updatedAt
+  
+  // Specific evidence types
+  weapon            WeaponEvidence?
+  car               CarEvidence?
+  imageEvidence     ImageEvidence?
+  document          DocumentEvidence?
+  
+  // Relationships
+  relationships     EvidenceRelationship[] @relation("SourceEvidence")
+  targetRelationships EvidenceRelationship[] @relation("TargetEvidence")
 }
 
-model Suspect {
-
+// Weapon Evidence
+model WeaponEvidence {
   id                String   @id @default(cuid())
-
-  caseId            String
-
-  fullName          String
-
-  threatLevel       String
-
-  status            String
-
-  description       String
-
-  imageUrl          String?
-
+  evidenceId        String   @unique
+  evidence          Evidence @relation(fields: [evidenceId], references: [id])
+  
+  weaponType        String
+  brand             String?
+  model             String?
+  serialNumber      String?
+  caliber           String?
+  condition         String?
+  quality           String?
+  owner             String?
+  registeredOwner    String?
+  licenseStatus     String?
+  seizedFrom        String?
+  seizureLocation   String?
+  seizureDate       String?
+  chainOfCustody    String?
+  model3dUrl        String?
+  model3dType       String?
+  images            String?
   createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
 
+// Car Evidence
+model CarEvidence {
+  id                String   @id @default(cuid())
+  evidenceId        String   @unique
+  evidence          Evidence @relation(fields: [evidenceId], references: [id])
+  
+  vehicleType       String
+  make              String?
+  model             String?
+  year              Int?
+  trim              String?
+  plateNumber       String?
+  plateState        String?
+  vin               String?
+  color             String?
+  interiorColor     String?
+  bodyStyle         String?
+  owner             String?
+  registeredOwner   String?
+  insuranceStatus   String?
+  condition         String?
+  mileage           Int?
+  damage            String?
+  seizedFrom        String?
+  seizureLocation   String?
+  seizureDate       String?
+  model3dUrl        String?
+  model3dType       String?
+  images            String?
+  currentStatus     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Image Evidence
+model ImageEvidence {
+  id                String   @id @default(cuid())
+  evidenceId        String   @unique
+  evidence          Evidence @relation(fields: [evidenceId], references: [id])
+  
+  imageUrl          String
+  thumbnailUrl      String?
+  originalFilename  String?
+  fileSize          Int?
+  fileType          String?
+  dimensions        String?
+  caption           String?
+  locationTaken     String?
+  dateTaken         String?
+  cameraModel       String?
+  gpsCoordinates    String?
+  contentType       String?
+  containsFaces     Boolean?
+  facesDetected     Int?
+  facesIdentified   String?
+  analysisNotes     String?
+  enhancementApplied Boolean?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Document Evidence
+model DocumentEvidence {
+  id                String   @id @default(cuid())
+  evidenceId        String   @unique
+  evidence          Evidence @relation(fields: [evidenceId], references: [id])
+  
+  documentType      String
+  title             String?
+  documentNumber    String?
+  fileUrl           String
+  fileSize          Int?
+  fileType          String?
+  pages             Int?
+  summary           String?
+  keyParties        String?
+  dateIssued        String?
+  dateExpires       String?
+  issuingAuthority  String?
+  securityLevel     String?
+  verified          Boolean?
+  verificationNotes String?
+  analysisNotes     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Evidence Relationships
+model EvidenceRelationship {
+  id                String   @id @default(cuid())
+  sourceEvidenceId  String
+  sourceEvidence    Evidence @relation("SourceEvidence", fields: [sourceEvidenceId], references: [id])
+  targetEvidenceId  String
+  targetEvidence    Evidence @relation("TargetEvidence", fields: [targetEvidenceId], references: [id])
+  relationshipType  String
+  description       String?
+  confidence        String?
+  caseId            String
+  createdAt         DateTime @default(now())
+}
+
+// Legacy Models
+model Suspect {
+  id                String   @id @default(cuid())
+  caseId            String
+  fullName          String
+  threatLevel       String
+  status            String
+  description       String
+  imageUrl          String?
+  createdAt         DateTime @default(now())
   case              Case @relation(fields: [caseId], references: [id])
-
 }
 
 model Relationship {
   id            String   @id @default(uuid())
-
   sourceId      String
   sourceType    String
-
   targetId      String
   targetType    String
-
   label         String
-
   caseId        String
   case          Case @relation(fields: [caseId], references: [id])
-
   createdAt     DateTime @default(now())
 }
 
 model TimelineEvent {
-
   id                String   @id @default(cuid())
-
   caseId            String
-
   title             String
   description       String
-
   eventTime         String
-
   createdAt         DateTime @default(now())
-
   case              Case @relation(fields: [caseId], references: [id])
-
 }
 
 model InvestigationLog {
-
   id                String   @id @default(cuid())
-
   caseId            String
-
   message           String
-
   createdBy         String
-
   createdAt         DateTime @default(now())
-
   case              Case @relation(fields: [caseId], references: [id])
-
 }
 
 model GraphNode {
-
   id            String @id @default(cuid())
-
   boardId       String
-
   board         Board @relation(fields: [boardId], references: [id])
-
   nodeType      String
-
   title         String
-
   subtitle      String?
-
   classification String @default("CONFIDENTIAL")
-
   x             Float
   y             Float
-
   metadata      String?
-
   createdBy     String?
-
   createdAt     DateTime @default(now())
-
 }
 
 model GraphEdge {
-
   id            String @id @default(cuid())
-
   boardId       String
-
   board         Board @relation(fields: [boardId], references: [id])
-
   source        String
   target        String
-
   label         String?
-
   animated      Boolean @default(true)
-
   createdAt     DateTime @default(now())
-
 }

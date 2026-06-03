@@ -14,7 +14,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Eye
+  Eye,
+  Package
 } from 'lucide-react'
 
 const items = [
@@ -22,6 +23,7 @@ const items = [
   { title: 'Cases', icon: FolderKanban, href: '/cases' },
   { title: 'Operations', icon: ShieldAlert, href: '/operations' },
   { title: 'Evidence Board', icon: Network, href: '/evidence' },
+  { title: 'Evidence Management', icon: Package, href: '/evidence-management' },
   { title: 'Suspects', icon: Users, href: '/suspects' },
   { title: 'Intelligence', icon: FileSearch, href: '/intelligence' },
   { title: 'Archives', icon: Archive, href: '/archives' },
