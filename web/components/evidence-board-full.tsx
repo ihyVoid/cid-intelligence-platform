@@ -200,18 +200,20 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
 
   const onConnect = useCallback(async (params: Connection) => {
     if (!params.source || !params.target) return
+    const sourceId = params.source
+    const targetId = params.target
     try {
       const response = await axios.post(`${API_URL}/graph/edge`, {
         boardId,
-        source: params.source,
-        target: params.target,
+        source: sourceId,
+        target: targetId,
         label: 'connected',
         animated: true
       })
       setEdges(prev => [...prev, {
         id: response.data.id,
-        source: params.source,
-        target: params.target,
+        source: sourceId,
+        target: targetId,
         animated: true,
         label: 'connected',
         style: { stroke: '#6366f1', strokeWidth: 2 },
@@ -390,7 +392,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
           className='!bg-[#0f0f14]'
           defaultEdgeOptions={{ animated: true, style: { strokeWidth: 2 } }}
           connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }}
-          connectionLineType='bezier'
           connectionRadius={30}
         minZoom={0.3}
         maxZoom={2}
@@ -530,7 +531,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
                           <span className='text-white text-xs truncate'>{otherNode?.data.label || 'Unknown'}</span>
                           <input
                             type='text'
-                            value={edge.label || ''}
+                            value={String(edge.label || '')}
                             onChange={(e) => updateEdgeLabel(edge.id, e.target.value)}
                             className='flex-1 bg-transparent border-none outline-none text-[#7E8299] text-xs truncate'
                             placeholder='Add label...'
