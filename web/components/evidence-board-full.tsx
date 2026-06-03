@@ -14,7 +14,8 @@ import ReactFlow, {
   BackgroundVariant,
   NodeChange,
   ReactFlowInstance,
-  NodeTypes
+  NodeTypes,
+  ReactFlowProvider
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { Plus, Trash2, Save, X, Users, FileText, MapPin, Zap, Search, Edit3, Loader2 } from 'lucide-react'
@@ -86,8 +87,13 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
 }
 
 // Define nodeTypes OUTSIDE component to prevent React Flow warning
-const nodeTypes: NodeTypes = {
+const nodeTypes = {
   evidenceNode: EvidenceNode
+}
+
+// Also export a default node type for fallback
+const defaultNodeTypes = {
+  default: EvidenceNode
 }
 
 interface EvidenceBoardFullProps {
@@ -365,28 +371,29 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
   }
 
   return (
-    <div style={{ width: '100%', height: '100%' }} className='relative' ref={reactFlowWrapper}>
-      <ReactFlow
-        nodes={filteredNodes}
-        edges={edges || []}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={onNodeClick}
-        onPaneClick={onPaneClick}
-        onInit={(instance) => {
-          setReactFlowInstance(instance)
-          // Fit view to show all nodes on initial load
-          setTimeout(() => instance.fitView({ padding: 0.3, duration: 300 }), 100)
-        }}
-        fitView
-        fitViewOptions={{ padding: 0.3 }}
-        className='!bg-[#0f0f14]'
-        defaultEdgeOptions={{ animated: true, style: { strokeWidth: 2 } }}
-        connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }}
-        connectionLineType='bezier'
-        connectionRadius={30}
+    <ReactFlowProvider>
+      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+        <ReactFlow
+          nodes={filteredNodes}
+          edges={edges || []}
+          nodeTypes={nodeTypes}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          onInit={(instance) => {
+            setReactFlowInstance(instance)
+            // Fit view to show all nodes on initial load
+            setTimeout(() => instance.fitView({ padding: 0.3, duration: 300 }), 100)
+          }}
+          fitView
+          fitViewOptions={{ padding: 0.3 }}
+          className='!bg-[#0f0f14]'
+          defaultEdgeOptions={{ animated: true, style: { strokeWidth: 2 } }}
+          connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }}
+          connectionLineType='bezier'
+          connectionRadius={30}
         minZoom={0.3}
         maxZoom={2}
         snapToGrid
@@ -626,5 +633,6 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         <span className='text-[#5a5a6e] text-xs'>Drag from node edge to connect | Click node to edit</span>
       </div>
     </div>
+    </ReactFlowProvider>
   )
 }
