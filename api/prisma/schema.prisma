@@ -73,8 +73,8 @@ model Case {
 
 model CaseReport {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   reportType        String
   reportNumber      Int
@@ -105,8 +105,8 @@ model CaseReport {
 
 model Suspect {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   fullName          String
   alias             String?
@@ -132,8 +132,8 @@ model Suspect {
 
 model Victim {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   fullName          String
   alias             String?
@@ -152,8 +152,8 @@ model Victim {
 
 model Witness {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   fullName          String
   alias             String?
@@ -172,8 +172,8 @@ model Witness {
 
 model TimelineEvent {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   title             String
   description       String
@@ -193,8 +193,8 @@ model TimelineEvent {
 
 model InvestigationLog {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   message           String
   type              String
@@ -205,8 +205,8 @@ model InvestigationLog {
 
 model Evidence {
   id                String   @id @default(cuid())
-  caseId            String
-  case              Case @relation(fields: [caseId], references: [id])
+  caseId            String?
+  case              Case?  @relation(fields: [caseId], references: [id])
   
   title             String
   description       String
