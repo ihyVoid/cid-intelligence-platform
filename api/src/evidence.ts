@@ -6,22 +6,25 @@ export async function evidenceRoutes(app: FastifyInstance) {
   app.post('/evidence', async (request, reply) => {
     const body = request.body as any
     try {
+      const evidenceType = body.evidenceType || body.type || 'other'
+      
       const evidence = await prisma.evidence.create({
         data: {
           title: body.title,
           description: body.description,
-          evidenceType: body.evidenceType || body.type || 'other',
+          evidenceType: evidenceType,
           classification: body.classification || 'CONFIDENTIAL',
           createdBy: body.createdBy || 'admin',
           caseId: body.caseId || null
         }
       })
 
-      if (body.type === 'weapon' || body.evidenceType === 'weapon') {
+      // Create type-specific evidence based on the type field
+      if (evidenceType === 'weapon') {
         await prisma.weaponEvidence.create({
           data: {
             evidenceId: evidence.id,
-            weaponType: body.weaponType || 'rifle',
+            weaponType: body.weaponType || 'other',
             serialNumber: body.serialNumber,
             condition: body.condition,
             caliber: body.caliber,
@@ -32,7 +35,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
             seizureDate: body.seizureDate
           }
         })
-      } else if (body.type === 'car' || body.evidenceType === 'car') {
+      } else if (evidenceType === 'car') {
         await prisma.carEvidence.create({
           data: {
             evidenceId: evidence.id,
@@ -47,7 +50,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
             seizureLocation: body.seizureLocation
           }
         })
-      } else if (body.type === 'image' || body.evidenceType === 'image') {
+      } else if (evidenceType === 'image') {
         await prisma.imageEvidence.create({
           data: {
             evidenceId: evidence.id,
@@ -59,7 +62,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
             description: body.description
           }
         })
-      } else if (body.type === 'document' || body.evidenceType === 'document') {
+      } else if (evidenceType === 'document') {
         await prisma.documentEvidence.create({
           data: {
             evidenceId: evidence.id,

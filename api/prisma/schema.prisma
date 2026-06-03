@@ -228,7 +228,7 @@ model WeaponEvidence {
   id                String   @id @default(cuid())
   evidenceId        String   @unique
   evidence          Evidence @relation(fields: [evidenceId], references: [id])
-  weaponType        String
+  weaponType        String?
   brand             String?
   model             String?
   serialNumber      String?
