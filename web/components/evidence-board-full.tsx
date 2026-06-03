@@ -38,6 +38,7 @@ const nodeTypeColors = {
 }
 
 function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
+  console.log('[EvidenceNode] rendering:', data?.label, 'selected:', selected)
   const Icon = nodeTypeIcons[data?.nodeType as keyof typeof nodeTypeIcons] || FileText
   const colors = nodeTypeColors[data?.nodeType as keyof typeof nodeTypeColors] || nodeTypeColors.document
   
@@ -86,21 +87,27 @@ function EvidenceNode({ data, selected }: { data: any; selected: boolean }) {
   )
 }
 
-// Define nodeTypes OUTSIDE component to prevent React Flow warning
-const nodeTypes = {
-  evidenceNode: EvidenceNode
-}
-
-// Also export a default node type for fallback
-const defaultNodeTypes = {
-  default: EvidenceNode
-}
-
 interface EvidenceBoardFullProps {
   boardId?: string
 }
 
 export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullProps) {
+  // Memoize node types and edge options to avoid React Flow warning
+  const nodeTypes = useMemo(() => ({
+    evidenceNode: EvidenceNode
+  }), [])
+  
+  const defaultEdgeOptions = useMemo(() => ({
+    animated: true,
+    style: { strokeWidth: 2 }
+  }), [])
+  
+  const connectionLineStyle = useMemo(() => ({
+    stroke: '#6366f1',
+    strokeWidth: 2,
+    strokeDasharray: '5,5'
+  }), [])
+  
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
   const [loading, setLoading] = useState(true)
@@ -149,6 +156,8 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
         }
       }))
       
+      // Log nodes for debugging
+      console.log('[EvidenceBoard] rendering with nodes:', formattedNodes.length)
       setNodes(formattedNodes)
       setEdges(response.data.edges || [])
     } catch (error) {
@@ -372,7 +381,7 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
 
   return (
     <ReactFlowProvider>
-      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div style={{ width: '100%', height: '500px', position: 'relative', overflow: 'hidden' }}>
         <ReactFlow
           nodes={filteredNodes}
           edges={edges || []}
@@ -383,15 +392,15 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
           onNodeClick={onNodeClick}
           onPaneClick={onPaneClick}
           onInit={(instance) => {
+            console.log('[ReactFlow] Initialized with nodes:', filteredNodes.length)
             setReactFlowInstance(instance)
-            // Fit view to show all nodes on initial load
             setTimeout(() => instance.fitView({ padding: 0.3, duration: 300 }), 100)
           }}
           fitView
           fitViewOptions={{ padding: 0.3 }}
           className='!bg-[#0f0f14]'
-          defaultEdgeOptions={{ animated: true, style: { strokeWidth: 2 } }}
-          connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2, strokeDasharray: '5,5' }}
+          defaultEdgeOptions={defaultEdgeOptions}
+          connectionLineStyle={connectionLineStyle}
           connectionRadius={30}
         minZoom={0.3}
         maxZoom={2}
