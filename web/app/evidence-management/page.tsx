@@ -78,7 +78,7 @@ export default function EvidenceManagementPage() {
 
   const handleAddEvidence = async () => {
     try {
-      const response = await axios.post(`${API_URL}/evidence/${newEvidence.type}s`, newEvidence)
+      const response = await axios.post(`${API_URL}/evidence`, newEvidence)
       if (response.data.data) setEvidences([...evidences, response.data.data])
       setShowAddModal(false)
       setNewEvidence({ type: 'weapon', title: '', description: '', caseId: '', classification: 'CONFIDENTIAL' })
