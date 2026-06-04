@@ -228,7 +228,7 @@ model WeaponEvidence {
   id                String   @id @default(cuid())
   evidenceId        String   @unique
   evidence          Evidence @relation(fields: [evidenceId], references: [id])
-  weaponType        String?
+  weaponType        String
   brand             String?
   model             String?
   serialNumber      String?
@@ -244,6 +244,7 @@ model WeaponEvidence {
   chainOfCustody    String?
   model3dUrl        String?
   model3dType       String?
+  organ             Boolean  @default(false)
   images            String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -253,7 +254,7 @@ model CarEvidence {
   id                String   @id @default(cuid())
   evidenceId        String   @unique
   evidence          Evidence @relation(fields: [evidenceId], references: [id])
-  vehicleType       String
+  vehicleType       String?
   make              String?
   model             String?
   year              Int?
@@ -285,7 +286,7 @@ model ImageEvidence {
   id                String   @id @default(cuid())
   evidenceId        String   @unique
   evidence          Evidence @relation(fields: [evidenceId], references: [id])
-  imageUrl          String
+  imageUrl          String?
   thumbnailUrl      String?
   originalFilename  String?
   fileSize          Int?
@@ -310,10 +311,10 @@ model DocumentEvidence {
   id                String   @id @default(cuid())
   evidenceId        String   @unique
   evidence          Evidence @relation(fields: [evidenceId], references: [id])
-  documentType      String
+  documentType      String?
   title             String?
   documentNumber    String?
-  fileUrl           String
+  fileUrl           String?
   fileSize          Int?
   fileType          String?
   pages             Int?

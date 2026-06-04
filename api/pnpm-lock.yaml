@@ -243,9 +243,6 @@ importers:
       lucide-react:
         specifier: ^1.16.0
         version: 1.16.0(react@19.2.6)
-      prisma:
-        specifier: ^6.19.3
-        version: 6.19.3(typescript@6.0.3)
       reactflow:
         specifier: ^11.11.4
         version: 11.11.4(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -259,6 +256,9 @@ importers:
       '@types/node':
         specifier: ^25.9.1
         version: 25.9.1
+      prisma:
+        specifier: ^6.19.3
+        version: 6.19.3(typescript@6.0.3)
       tsx:
         specifier: ^4.22.3
         version: 4.22.3

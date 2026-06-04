@@ -1,18 +1,25 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Sidebar } from '@/components/sidebar'
 import { Topbar } from '@/components/topbar'
-import { EvidenceViewer3D, generateWeaponHotspots, generateCarHotspots } from '@/components/evidence-viewer-3d'
+import { EvidenceViewer3D } from '@/components/evidence-viewer-3d'
 import { 
-  Plus, Search, Filter, Crosshair, Car, Image as ImageIcon, FileText, 
-  Trash2, Eye, X, Loader2, Grid3X3, List, Package
+  Plus, Search, Crosshair, Car, Image as ImageIcon, FileText, 
+  Trash2, Eye, X, Loader2, Package, RotateCcw, ChevronRight, Check
 } from 'lucide-react'
 import axios from 'axios'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 type EvidenceType = 'weapon' | 'car' | 'image' | 'document'
+
+interface Case {
+  id: string
+  title: string
+  caseNumber: string
+}
 
 interface Evidence {
   id: string
@@ -22,68 +29,185 @@ interface Evidence {
   evidenceType: EvidenceType
   classification: string
   createdAt: string
-  weapon?: any
-  car?: any
-  imageEvidence?: any
-  document?: any
+  weapon?: WeaponData
+  car?: CarData
+  imageEvidence?: ImageData
+  document?: DocumentData
+}
+
+interface WeaponData {
+  id: string
+  weaponType: 'pistol' | 'rifle'
+  model: string
+  serialNumber: string
+  owner: string
+  organ: boolean
+  brand: string
+  caliber: string
+}
+
+interface CarData {
+  id: string
+  plateNumber: string
+  owner: string
+  color: string
+  model: string
+  make: string
+}
+
+interface ImageData {
+  id: string
+  imageUrl: string
+  imageTitle: string
+  description: string
+}
+
+interface DocumentData {
+  id: string
+  title: string
+  description: string
+  customFields?: string
 }
 
 const typeIcons = { weapon: Crosshair, car: Car, image: ImageIcon, document: FileText }
 const typeColors = {
-  weapon: { bg: 'from-red-500 to-red-700', text: 'text-red-400' },
-  car: { bg: 'from-blue-500 to-blue-700', text: 'text-blue-400' },
-  image: { bg: 'from-purple-500 to-purple-700', text: 'text-purple-400' },
-  document: { bg: 'from-yellow-500 to-yellow-700', text: 'text-yellow-400' }
+  weapon: { bg: 'from-red-500 to-red-700', text: 'text-red-400', border: 'border-red-500/30' },
+  car: { bg: 'from-blue-500 to-blue-700', text: 'text-blue-400', border: 'border-blue-500/30' },
+  image: { bg: 'from-purple-500 to-purple-700', text: 'text-purple-400', border: 'border-purple-500/30' },
+  document: { bg: 'from-yellow-500 to-yellow-700', text: 'text-yellow-400', border: 'border-yellow-500/30' }
 }
 
 export default function EvidenceManagementPage() {
   const [ready, setReady] = useState(false)
   const [evidences, setEvidences] = useState<Evidence[]>([])
+  const [cases, setCases] = useState<Case[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterType, setFilterType] = useState<EvidenceType | 'all'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [modalType, setModalType] = useState<EvidenceType>('weapon')
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [show3DViewer, setShow3DViewer] = useState(false)
-  const [newEvidence, setNewEvidence] = useState({
-    type: 'weapon' as EvidenceType, title: '', description: '', caseId: '', classification: 'CONFIDENTIAL'
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [caseSearchQuery, setCaseSearchQuery] = useState('')
+  const [showCaseDropdown, setShowCaseDropdown] = useState(false)
+
+  const [weaponForm, setWeaponForm] = useState({
+    weaponType: 'pistol' as 'pistol' | 'rifle',
+    model: '', serialNumber: '', owner: '', organ: false, brand: '', caliber: '', caseId: '', title: ''
+  })
+
+  const [carForm, setCarForm] = useState({
+    plateNumber: '', owner: '', color: '', model: '', make: '', caseId: '', title: ''
+  })
+
+  const [imageForm, setImageForm] = useState({
+    imageUrl: '', imageTitle: '', description: '', caseId: '', title: ''
+  })
+
+  const [documentForm, setDocumentForm] = useState({
+    title: '', description: '', customFields: '', caseId: ''
   })
 
   useEffect(() => {
     const userStr = localStorage.getItem('cid_user')
     if (!userStr) { window.location.href = '/login'; return }
     setReady(true)
-    loadEvidences()
+    loadData()
   }, [])
 
-  const loadEvidences = async () => {
+  const loadData = async () => {
     setLoading(true)
     try {
-      const [weapons, cars, images, documents] = await Promise.all([
+      const [weapons, cars, images, documents, casesRes] = await Promise.all([
         axios.get(`${API_URL}/evidence/weapons`).catch(() => ({ data: { data: [] } })),
         axios.get(`${API_URL}/evidence/cars`).catch(() => ({ data: { data: [] } })),
         axios.get(`${API_URL}/evidence/images`).catch(() => ({ data: { data: [] } })),
-        axios.get(`${API_URL}/evidence/documents`).catch(() => ({ data: { data: [] } }))
+        axios.get(`${API_URL}/evidence/documents`).catch(() => ({ data: { data: [] } })),
+        axios.get(`${API_URL}/cases`).catch(() => ({ data: { data: [] } }))
       ])
+      
       const allEvidence: Evidence[] = []
-      weapons.data.data.forEach((w: any) => allEvidence.push({ ...w.evidence, weapon: w, evidenceType: 'weapon' }))
-      cars.data.data.forEach((c: any) => allEvidence.push({ ...c.evidence, car: c, evidenceType: 'car' }))
-      images.data.data.forEach((img: any) => allEvidence.push({ ...img.evidence, imageEvidence: img, evidenceType: 'image' }))
-      documents.data.data.forEach((doc: any) => allEvidence.push({ ...doc.evidence, document: doc, evidenceType: 'document' }))
+      weapons.data.data.forEach((w: any) => allEvidence.push({ ...w.evidence, weapon: { ...w, id: w.id }, evidenceType: 'weapon' }))
+      cars.data.data.forEach((c: any) => allEvidence.push({ ...c.evidence, car: { ...c, id: c.id }, evidenceType: 'car' }))
+      images.data.data.forEach((img: any) => allEvidence.push({ ...img.evidence, imageEvidence: { ...img, id: img.id }, evidenceType: 'image' }))
+      documents.data.data.forEach((doc: any) => allEvidence.push({ ...doc.evidence, document: { ...doc, id: doc.id }, evidenceType: 'document' }))
+      
       setEvidences(allEvidence)
+      setCases(casesRes.data.data || [])
     } catch (error) { console.error('Error loading:', error) }
     setLoading(false)
   }
 
-  const handleAddEvidence = async () => {
+  const handleAddWeapon = async () => {
+    if (!weaponForm.title.trim() || !weaponForm.caseId.trim()) return
     try {
-      const response = await axios.post(`${API_URL}/evidence`, newEvidence)
-      if (response.data.data) setEvidences([...evidences, response.data.data])
+      await axios.post(`${API_URL}/evidence/weapon`, {
+        caseId: weaponForm.caseId, title: weaponForm.title,
+        description: `Type: ${weaponForm.weaponType}\nModel: ${weaponForm.model}\nSerial: ${weaponForm.serialNumber}\nOwner: ${weaponForm.owner}\nOrgan: ${weaponForm.organ ? 'Yes' : 'No'}`,
+        classification: 'CONFIDENTIAL', weaponType: weaponForm.weaponType, model: weaponForm.model, serialNumber: weaponForm.serialNumber,
+        owner: weaponForm.owner, organ: weaponForm.organ, brand: weaponForm.brand, caliber: weaponForm.caliber
+      })
+      setSuccessMessage(`${weaponForm.weaponType.toUpperCase()} added successfully!`)
+      setShowSuccessModal(true)
       setShowAddModal(false)
-      setNewEvidence({ type: 'weapon', title: '', description: '', caseId: '', classification: 'CONFIDENTIAL' })
-      loadEvidences()
-    } catch (error) { console.error('Error adding:', error) }
+      resetForms()
+      loadData()
+    } catch (error) { console.error('Error adding weapon:', error) }
+  }
+
+  const handleAddCar = async () => {
+    if (!carForm.title.trim() || !carForm.caseId.trim()) return
+    try {
+      await axios.post(`${API_URL}/evidence/car`, {
+        caseId: carForm.caseId, title: carForm.title,
+        description: `Plate: ${carForm.plateNumber}\nOwner: ${carForm.owner}\nColor: ${carForm.color}\nModel: ${carForm.model}`,
+        classification: 'CONFIDENTIAL', plateNumber: carForm.plateNumber, owner: carForm.owner, color: carForm.color, model: carForm.model, make: carForm.make
+      })
+      setSuccessMessage('Car evidence added successfully!')
+      setShowSuccessModal(true)
+      setShowAddModal(false)
+      resetForms()
+      loadData()
+    } catch (error) { console.error('Error adding car:', error) }
+  }
+
+  const handleAddImage = async () => {
+    if (!imageForm.title.trim() || !imageForm.caseId.trim()) return
+    try {
+      await axios.post(`${API_URL}/evidence/image`, {
+        caseId: imageForm.caseId, title: imageForm.title, description: imageForm.description,
+        imageUrl: imageForm.imageUrl, imageTitle: imageForm.imageTitle, classification: 'CONFIDENTIAL'
+      })
+      setSuccessMessage('Image evidence added successfully!')
+      setShowSuccessModal(true)
+      setShowAddModal(false)
+      resetForms()
+      loadData()
+    } catch (error) { console.error('Error adding image:', error) }
+  }
+
+  const handleAddDocument = async () => {
+    if (!documentForm.title.trim() || !documentForm.caseId.trim()) return
+    try {
+      await axios.post(`${API_URL}/evidence/document`, {
+        caseId: documentForm.caseId, title: documentForm.title, description: documentForm.description,
+        customFields: documentForm.customFields, classification: 'CONFIDENTIAL'
+      })
+      setSuccessMessage('Document evidence added successfully!')
+      setShowSuccessModal(true)
+      setShowAddModal(false)
+      resetForms()
+      loadData()
+    } catch (error) { console.error('Error adding document:', error) }
+  }
+
+  const resetForms = () => {
+    setWeaponForm({ weaponType: 'pistol', model: '', serialNumber: '', owner: '', organ: false, brand: '', caliber: '', caseId: '', title: '' })
+    setCarForm({ plateNumber: '', owner: '', color: '', model: '', make: '', caseId: '', title: '' })
+    setImageForm({ imageUrl: '', imageTitle: '', description: '', caseId: '', title: '' })
+    setDocumentForm({ title: '', description: '', customFields: '', caseId: '' })
   }
 
   const handleDeleteEvidence = async (evidence: Evidence) => {
@@ -106,13 +230,28 @@ export default function EvidenceManagementPage() {
     return matchesSearch && matchesType
   })
 
-  const getHotspots = (evidence: Evidence) => {
-    if (evidence.evidenceType === 'weapon' && evidence.weapon) return generateWeaponHotspots(evidence.weapon, evidence.weapon.weaponType || 'pistol')
-    if (evidence.evidenceType === 'car' && evidence.car) return generateCarHotspots(evidence.car)
-    return []
+  const filteredCases = cases.filter(c => 
+    c.title.toLowerCase().includes(caseSearchQuery.toLowerCase()) || c.caseNumber.toLowerCase().includes(caseSearchQuery.toLowerCase())
+  )
+
+  const get3DModel = (evidence: Evidence) => {
+    if (evidence.evidenceType === 'weapon' && evidence.weapon) return evidence.weapon.weaponType === 'rifle' ? '/rifle.glb' : '/pistol.glb'
+    if (evidence.evidenceType === 'car') return '/car.glb'
+    return null
   }
 
-  if (!ready) return <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center"><div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin" /></div>
+  const stats = useMemo(() => ({
+    weapons: evidences.filter(e => e.evidenceType === 'weapon').length,
+    cars: evidences.filter(e => e.evidenceType === 'car').length,
+    images: evidences.filter(e => e.evidenceType === 'image').length,
+    documents: evidences.filter(e => e.evidenceType === 'document').length
+  }), [evidences])
+
+  if (!ready) return (
+    <div className="min-h-screen bg-[#0f0f14] flex items-center justify-center">
+      <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <main className="flex bg-[#0f0f14] min-h-screen">
@@ -123,26 +262,45 @@ export default function EvidenceManagementPage() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-white">Evidence Management</h1>
-              <p className="text-[#7E8299] text-sm mt-1">Manage all evidence with 3D visualization</p>
+              <p className="text-[#7E8299] text-sm mt-1">Manage all evidence with interactive 3D visualization</p>
             </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="p-2 bg-[#1a1a22] border border-[#2a2a35] rounded-xl text-[#B7B7B7] hover:text-white transition-all">
-                {viewMode === 'grid' ? <List className="w-4 h-4" /> : <Grid3X3 className="w-4 h-4" />}
-              </button>
-              <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 rounded-xl text-white font-medium shadow-lg shadow-red-500/20 transition-all">
-                <Plus className="w-4 h-4" />Add Evidence
-              </button>
-            </div>
+            <button onClick={() => { setShowAddModal(true); setModalType('weapon') }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 rounded-xl text-white font-medium shadow-lg shadow-red-500/20 transition-all">
+              <Plus className="w-4 h-4" />Add Evidence
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {[
+              { type: 'weapons', count: stats.weapons, icon: Crosshair, color: 'from-red-500 to-red-700', label: 'Weapons' },
+              { type: 'cars', count: stats.cars, icon: Car, color: 'from-blue-500 to-blue-700', label: 'Vehicles' },
+              { type: 'images', count: stats.images, icon: ImageIcon, color: 'from-purple-500 to-purple-700', label: 'Images' },
+              { type: 'documents', count: stats.documents, icon: FileText, color: 'from-yellow-500 to-yellow-700', label: 'Documents' }
+            ].map(stat => (
+              <div key={stat.type} className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
+                    <stat.icon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-white">{stat.count}</p>
+                    <p className="text-[#7E8299] text-xs">{stat.label}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center gap-4 mb-6">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5a5a6e]" />
-              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search evidence..." className="w-full pl-10 pr-4 py-2 bg-[#1a1a22] border border-[#2a2a35] rounded-xl text-white text-sm focus:outline-none focus:border-red-500/50" />
+              <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} 
+                placeholder="Search evidence..." 
+                className="w-full pl-10 pr-4 py-2.5 bg-[#1a1a22] border border-[#2a2a35] rounded-xl text-white text-sm focus:outline-none focus:border-red-500/50" />
             </div>
             <div className="flex items-center gap-2">
               {(['all', 'weapon', 'car', 'image', 'document'] as const).map(type => {
-                const Icon = type === 'all' ? Filter : typeIcons[type as EvidenceType]
+                const Icon = type === 'all' ? Package : typeIcons[type as EvidenceType]
                 return (
                   <button key={type} onClick={() => setFilterType(type)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${filterType === type ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-[#1a1a22] border border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'}`}>
@@ -153,252 +311,465 @@ export default function EvidenceManagementPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-4 mb-6">
-            {(['weapon', 'car', 'image', 'document'] as const).map(type => {
-              const Icon = typeIcons[type]
-              const colors = typeColors[type]
-              return (
-                <div key={type} className="bg-gradient-to-br from-[#1a1a22] to-[#25252f] border border-[#2a2a35] rounded-xl p-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-white font-semibold">{evidences.filter(e => e.evidenceType === type).length}</p>
-                      <p className="text-[#7E8299] text-xs capitalize">{type}s</p>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
           {loading ? (
-            <div className="flex items-center justify-center py-20">
+            <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
-              <span className="ml-3 text-[#7E8299]">Loading evidence...</span>
             </div>
           ) : filteredEvidences.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="w-16 h-16 bg-[#1a1a22] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Package className="w-8 h-8 text-[#5a5a6e]" />
-              </div>
-              <p className="text-[#7E8299]">No evidence found</p>
-              <button onClick={() => setShowAddModal(true)} className="mt-4 px-4 py-2 bg-red-500/20 text-red-400 rounded-xl text-sm font-medium">Add First Evidence</button>
+            <div className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-xl p-12 text-center">
+              <Package className="w-16 h-16 text-[#3a3a45] mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">No Evidence Found</h3>
+              <p className="text-[#7E8299] mb-6">Start by adding your first piece of evidence</p>
+              <button onClick={() => setShowAddModal(true)} className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-xl text-red-400 font-medium">
+                Add First Evidence
+              </button>
             </div>
-          ) : viewMode === 'grid' ? (
+          ) : (
             <div className="grid grid-cols-3 gap-4">
-              {filteredEvidences.map(evidence => {
-                const Icon = typeIcons[evidence.evidenceType]
+              {filteredEvidences.map((evidence, index) => {
                 const colors = typeColors[evidence.evidenceType]
+                const Icon = typeIcons[evidence.evidenceType]
                 return (
-                  <div key={evidence.id} onClick={() => setSelectedEvidence(evidence)}
-                    className="bg-gradient-to-br from-[#1a1a22] to-[#25252f] border border-[#2a2a35] rounded-xl p-4 hover:border-[#3a3a45] transition-all cursor-pointer group">
+                  <motion.div key={evidence.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}
+                    className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-xl p-5 hover:border-[#3a3a45] transition-all cursor-pointer group">
                     <div className="flex items-start justify-between mb-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
+                      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors.bg} flex items-center justify-center`}>
                         <Icon className="w-6 h-6 text-white" />
                       </div>
-                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="text-xs text-[#5a5a6e] uppercase">{evidence.evidenceType}</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-red-400 transition-colors">{evidence.title}</h3>
+                    <p className="text-[#7E8299] text-sm mb-4 line-clamp-2">{evidence.description}</p>
+                    <div className="flex items-center justify-between pt-4 border-t border-[#2a2a35]">
+                      <span className="text-xs text-[#5a5a6e]">{new Date(evidence.createdAt).toLocaleDateString()}</span>
+                      <div className="flex gap-2">
                         {(evidence.evidenceType === 'weapon' || evidence.evidenceType === 'car') && (
-                          <button onClick={(e) => { e.stopPropagation(); setSelectedEvidence(evidence); setShow3DViewer(true) }}
-                            className="p-1.5 bg-[#2a2a35] hover:bg-blue-500/20 rounded-lg text-[#5a5a6e] hover:text-blue-400">
+                          <button onClick={() => { setSelectedEvidence(evidence); setShow3DViewer(true) }}
+                            className="p-2 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg text-blue-400 transition-colors" title="View 3D">
                             <Eye className="w-4 h-4" />
                           </button>
                         )}
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteEvidence(evidence) }}
-                          className="p-1.5 bg-[#2a2a35] hover:bg-red-500/20 rounded-lg text-[#5a5a6e] hover:text-red-400">
-                          <Trash2 className="w-4 h-4" />
+                        <button onClick={() => setSelectedEvidence(evidence)}
+                          className="p-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-lg text-[#7E8299] transition-colors">
+                          <ChevronRight className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
-                    <h3 className="text-white font-semibold mb-1 truncate">{evidence.title}</h3>
-                    <p className="text-[#7E8299] text-xs mb-3 line-clamp-2">{evidence.description}</p>
-                    <div className="flex items-center justify-between">
-                      <span className={`${colors.text} text-[10px] uppercase tracking-wider font-medium`}>{evidence.evidenceType}</span>
-                      <span className="text-[#5a5a6e] text-[10px]">{new Date(evidence.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
+                  </motion.div>
                 )
               })}
-            </div>
-          ) : (
-            <div className="bg-[#1a1a22] border border-[#2a2a35] rounded-xl overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-[#0f0f14] border-b border-[#2a2a35]">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-[#7E8299] text-xs font-medium uppercase">Type</th>
-                    <th className="text-left px-4 py-3 text-[#7E8299] text-xs font-medium uppercase">Title</th>
-                    <th className="text-left px-4 py-3 text-[#7E8299] text-xs font-medium uppercase">Classification</th>
-                    <th className="text-left px-4 py-3 text-[#7E8299] text-xs font-medium uppercase">Created</th>
-                    <th className="text-right px-4 py-3 text-[#7E8299] text-xs font-medium uppercase">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEvidences.map(evidence => {
-                    const Icon = typeIcons[evidence.evidenceType]
-                    const colors = typeColors[evidence.evidenceType]
-                    return (
-                      <tr key={evidence.id} onClick={() => setSelectedEvidence(evidence)} className="border-b border-[#2a2a35] hover:bg-[#25252f] cursor-pointer">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-                              <Icon className="w-4 h-4 text-white" />
-                            </div>
-                            <span className={`${colors.text} text-xs capitalize font-medium`}>{evidence.evidenceType}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-white text-sm">{evidence.title}</td>
-                        <td className="px-4 py-3"><span className="px-2 py-1 bg-red-500/20 text-red-400 text-[10px] rounded-lg">{evidence.classification}</span></td>
-                        <td className="px-4 py-3 text-[#7E8299] text-sm">{new Date(evidence.createdAt).toLocaleDateString()}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            {(evidence.evidenceType === 'weapon' || evidence.evidenceType === 'car') && (
-                              <button onClick={(e) => { e.stopPropagation(); setSelectedEvidence(evidence); setShow3DViewer(true) }}
-                                className="p-1.5 hover:bg-blue-500/20 rounded-lg text-[#5a5a6e] hover:text-blue-400"><Eye className="w-4 h-4" /></button>
-                            )}
-                            <button onClick={(e) => { e.stopPropagation(); handleDeleteEvidence(evidence) }}
-                              className="p-1.5 hover:bg-red-500/20 rounded-lg text-[#5a5a6e] hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
             </div>
           )}
         </div>
       </div>
 
-      {show3DViewer && selectedEvidence && (
-        <EvidenceViewer3D evidenceType={selectedEvidence.evidenceType} weaponType={selectedEvidence.weapon?.weaponType}
-          hotspots={getHotspots(selectedEvidence)} onClose={() => { setShow3DViewer(false); setSelectedEvidence(null) }} />
-      )}
-
-      {selectedEvidence && !show3DViewer && (
-        <div className="fixed right-0 top-0 bottom-0 w-96 bg-[#1a1a22] border-l border-[#2a2a35] shadow-xl z-40 overflow-y-auto">
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              {(() => {
-                const Icon = typeIcons[selectedEvidence.evidenceType]
-                const colors = typeColors[selectedEvidence.evidenceType]
-                return (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br ${colors.bg}`}>
-                        <Icon className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-white font-semibold capitalize">{selectedEvidence.evidenceType}</h3>
-                        <p className="text-[#7E8299] text-xs">Evidence Details</p>
-                      </div>
-                    </div>
-                  </>
-                )
-              })()}
-              <button onClick={() => setSelectedEvidence(null)} className="p-2 hover:bg-[#2a2a35] rounded-lg text-[#5a5a6e]"><X className="w-5 h-5" /></button>
-            </div>
-
-            <h2 className="text-xl font-bold text-white mb-4">{selectedEvidence.title}</h2>
-            <div className="space-y-4">
-              <div className="bg-[#0f0f14] rounded-xl p-4">
-                <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Description</h4>
-                <p className="text-white text-sm">{selectedEvidence.description}</p>
-              </div>
-
-              {selectedEvidence.weapon && (
-                <div className="bg-[#0f0f14] rounded-xl p-4">
-                  <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Weapon Details</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><p className="text-[#5a5a6e] text-xs">Type</p><p className="text-white text-sm capitalize">{selectedEvidence.weapon.weaponType}</p></div>
-                    <div><p className="text-[#5a5a6e] text-xs">Brand</p><p className="text-white text-sm">{selectedEvidence.weapon.brand || 'Unknown'}</p></div>
-                    <div><p className="text-[#5a5a6e] text-xs">Serial Number</p><p className="text-white text-sm">{selectedEvidence.weapon.serialNumber || 'Unknown'}</p></div>
-                    <div><p className="text-[#5a5a6e] text-xs">Caliber</p><p className="text-white text-sm">{selectedEvidence.weapon.caliber || 'Unknown'}</p></div>
+      <AnimatePresence>
+        {show3DViewer && selectedEvidence && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-8">
+            <div className="w-full max-w-5xl h-full bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b border-[#2a2a35]">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${typeColors[selectedEvidence.evidenceType].bg} flex items-center justify-center`}>
+                    {(() => {
+                    const IconComponent = typeIcons[selectedEvidence.evidenceType]
+                    return IconComponent ? <IconComponent className="w-5 h-5 text-white" /> : null
+                  })()}
                   </div>
-                  <button onClick={() => setShow3DViewer(true)} className="mt-4 w-full py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium flex items-center justify-center gap-2">
-                    <Eye className="w-4 h-4" />View 3D Model
+                  <div>
+                    <h3 className="text-lg font-bold text-white">3D Evidence Viewer</h3>
+                    <p className="text-[#7E8299] text-xs">{selectedEvidence.title}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShow3DViewer(false)} className="p-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-white">
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setShow3DViewer(false)} className="p-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-white">
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-              )}
+              </div>
+              <div className="h-[calc(100%-64px)]">
+                <EvidenceViewer3D 
+                  modelPath={get3DModel(selectedEvidence) || ''}
+                  evidence={selectedEvidence}
+                  hotspots={[
+                    { position: [0, 0, 0.5], label: 'Point 1', info: 'Primary inspection point' },
+                    { position: [0.3, 0.2, 0.3], label: 'Point 2', info: 'Secondary details' },
+                    { position: [-0.2, -0.1, 0.4], label: 'Point 3', info: 'Additional information' },
+                  ]}
+                />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-              {selectedEvidence.car && (
-                <div className="bg-[#0f0f14] rounded-xl p-4">
-                  <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Vehicle Details</h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><p className="text-[#5a5a6e] text-xs">Make</p><p className="text-white text-sm">{selectedEvidence.car.make || 'Unknown'}</p></div>
-                    <div><p className="text-[#5a5a6e] text-xs">Model</p><p className="text-white text-sm">{selectedEvidence.car.model || 'Unknown'}</p></div>
-                    <div><p className="text-[#5a5a6e] text-xs">Plate</p><p className="text-white text-sm">{selectedEvidence.car.plateNumber || 'Unknown'}</p></div>
-                    <div><p className="text-[#5a5a6e] text-xs">Color</p><p className="text-white text-sm">{selectedEvidence.car.color || 'Unknown'}</p></div>
-                  </div>
-                  <button onClick={() => setShow3DViewer(true)} className="mt-4 w-full py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium flex items-center justify-center gap-2">
-                    <Eye className="w-4 h-4" />View 3D Model
-                  </button>
-                </div>
-              )}
-
-              <div className="bg-[#0f0f14] rounded-xl p-4">
-                <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Metadata</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-[#5a5a6e]">Classification</span><span className="text-red-400">{selectedEvidence.classification}</span></div>
-                  <div className="flex justify-between"><span className="text-[#5a5a6e]">Created</span><span className="text-white">{new Date(selectedEvidence.createdAt).toLocaleString()}</span></div>
-                </div>
+      <AnimatePresence>
+        {showAddModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+              
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-white">Add New Evidence</h3>
+                <button onClick={() => { setShowAddModal(false); resetForms() }} className="text-[#5a5a6e] hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
               </div>
 
-              <button onClick={() => handleDeleteEvidence(selectedEvidence)}
-                className="w-full py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium flex items-center justify-center gap-2">
-                <Trash2 className="w-4 h-4" />Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white">Add New Evidence</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-[#5a5a6e] hover:text-white"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[#7E8299] text-sm font-medium block mb-2">Evidence Type *</label>
-                <div className="grid grid-cols-4 gap-2">
+              <div className="mb-6">
+                <label className="text-[#7E8299] text-sm font-medium block mb-3">Evidence Type *</label>
+                <div className="grid grid-cols-4 gap-3">
                   {(['weapon', 'car', 'image', 'document'] as const).map(type => {
                     const Icon = typeIcons[type]
                     const colors = typeColors[type]
                     return (
-                      <button key={type} onClick={() => setNewEvidence({ ...newEvidence, type })}
-                        className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${newEvidence.type === type ? `border-red-500 bg-red-500/10 ${colors.text}` : 'border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'}`}>
-                        <Icon className="w-5 h-5" /><span className="text-xs capitalize">{type}</span>
+                      <button key={type} onClick={() => setModalType(type)}
+                        className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${modalType === type ? `border-red-500 bg-red-500/10 ${colors.text}` : 'border-[#2a2a35] text-[#7E8299] hover:border-[#3a3a45]'}`}>
+                        <Icon className="w-6 h-6" /><span className="text-sm capitalize font-medium">{type}</span>
                       </button>
                     )
                   })}
                 </div>
               </div>
-              <div>
-                <label className="text-[#7E8299] text-sm font-medium block mb-2">Title *</label>
-                <input type="text" value={newEvidence.title} onChange={(e) => setNewEvidence({ ...newEvidence, title: e.target.value })}
-                  placeholder="Evidence title..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" autoFocus />
+
+              <div className="mb-6 relative">
+                <label className="text-[#7E8299] text-sm font-medium block mb-2">Case *</label>
+                <div className="relative">
+                  <input type="text" value={caseSearchQuery} onChange={(e) => setCaseSearchQuery(e.target.value)}
+                    onFocus={() => setShowCaseDropdown(true)} placeholder="Search or select a case..."
+                    className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                  {showCaseDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a22] border border-[#2a2a35] rounded-xl max-h-48 overflow-y-auto z-10">
+                      {filteredCases.length === 0 ? (
+                        <div className="p-4 text-[#5a5a6e] text-sm text-center">No cases found</div>
+                      ) : (
+                        filteredCases.map(c => (
+                          <button key={c.id} onClick={() => {
+                            setCaseSearchQuery(c.title)
+                            const setter = modalType === 'weapon' ? setWeaponForm : modalType === 'car' ? setCarForm : modalType === 'image' ? setImageForm : setDocumentForm
+                            setter((prev: any) => ({ ...prev, caseId: c.id }))
+                            setShowCaseDropdown(false)
+                          }} className="w-full px-4 py-3 text-left text-white hover:bg-[#2a2a35] text-sm border-b border-[#2a2a35] last:border-0">
+                            <span className="font-medium">{c.title}</span>
+                            <span className="text-[#5a5a6e] ml-2 text-xs">{c.caseNumber}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="text-[#7E8299] text-sm font-medium block mb-2">Description</label>
-                <textarea value={newEvidence.description} onChange={(e) => setNewEvidence({ ...newEvidence, description: e.target.value })}
-                  placeholder="Evidence description..." rows={3} className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none resize-none" />
+
+              {modalType === 'weapon' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[#7E8299] text-sm font-medium block mb-2">Title *</label>
+                      <input type="text" value={weaponForm.title} onChange={(e) => setWeaponForm({...weaponForm, title: e.target.value})}
+                        placeholder="Evidence title..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[#7E8299] text-sm font-medium block mb-2">Weapon Type *</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['pistol', 'rifle'] as const).map(type => (
+                          <button key={type} onClick={() => setWeaponForm({...weaponForm, weaponType: type})}
+                            className={`p-3 rounded-xl border text-sm font-medium transition-all ${weaponForm.weaponType === type ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-[#2a2a35] text-[#7E8299]'}`}>
+                            {type.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Model</label>
+                      <input type="text" value={weaponForm.model} onChange={(e) => setWeaponForm({...weaponForm, model: e.target.value})}
+                        placeholder="Weapon model..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Serial Number</label>
+                      <input type="text" value={weaponForm.serialNumber} onChange={(e) => setWeaponForm({...weaponForm, serialNumber: e.target.value})}
+                        placeholder="Serial number..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Owner</label>
+                      <input type="text" value={weaponForm.owner} onChange={(e) => setWeaponForm({...weaponForm, owner: e.target.value})}
+                        placeholder="Owner name..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Brand</label>
+                      <input type="text" value={weaponForm.brand} onChange={(e) => setWeaponForm({...weaponForm, brand: e.target.value})}
+                        placeholder="Brand..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Caliber</label>
+                      <input type="text" value={weaponForm.caliber} onChange={(e) => setWeaponForm({...weaponForm, caliber: e.target.value})}
+                        placeholder="Caliber..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div className="flex items-center gap-3 bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-4">
+                      <input type="checkbox" id="organ" checked={weaponForm.organ} onChange={(e) => setWeaponForm({...weaponForm, organ: e.target.checked})}
+                        className="w-5 h-5 rounded border-[#2a2a35] accent-red-500" />
+                      <label htmlFor="organ" className="text-white text-sm cursor-pointer">Organ Evidence</label>
+                    </div>
+                  </div>
+                  <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-[#7E8299] text-sm mb-3">
+                      <Eye className="w-4 h-4" /><span>3D Model: {weaponForm.weaponType.toUpperCase()}</span>
+                    </div>
+                    <div className="bg-[#1a1a22] rounded-lg p-6 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${weaponForm.weaponType === 'rifle' ? 'from-blue-500 to-blue-700' : 'from-red-500 to-red-700'} flex items-center justify-center mx-auto mb-3`}>
+                          <Crosshair className="w-8 h-8 text-white" />
+                        </div>
+                        <p className="text-white font-medium">{weaponForm.weaponType.toUpperCase()}</p>
+                        <p className="text-[#5a5a6e] text-xs mt-1">3D model will be available after creation</p>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={handleAddWeapon} disabled={!weaponForm.title.trim() || !weaponForm.caseId.trim()}
+                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-red-500/20 transition-all">
+                    Add Weapon Evidence
+                  </button>
+                </div>
+              )}
+
+              {modalType === 'car' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Title *</label>
+                      <input type="text" value={carForm.title} onChange={(e) => setCarForm({...carForm, title: e.target.value})}
+                        placeholder="Evidence title..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Plate Number *</label>
+                      <input type="text" value={carForm.plateNumber} onChange={(e) => setCarForm({...carForm, plateNumber: e.target.value})}
+                        placeholder="ABC-1234" className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Owner</label>
+                      <input type="text" value={carForm.owner} onChange={(e) => setCarForm({...carForm, owner: e.target.value})}
+                        placeholder="Owner name..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Color</label>
+                      <input type="text" value={carForm.color} onChange={(e) => setCarForm({...carForm, color: e.target.value})}
+                        placeholder="Color..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Make</label>
+                      <input type="text" value={carForm.make} onChange={(e) => setCarForm({...carForm, make: e.target.value})}
+                        placeholder="Toyota, BMW..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Model</label>
+                      <input type="text" value={carForm.model} onChange={(e) => setCarForm({...carForm, model: e.target.value})}
+                        placeholder="Model..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                    </div>
+                  </div>
+                  <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-4">
+                    <div className="flex items-center gap-2 text-[#7E8299] text-sm mb-3">
+                      <Eye className="w-4 h-4" /><span>3D Model: Vehicle</span>
+                    </div>
+                    <div className="bg-[#1a1a22] rounded-lg p-6 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center mx-auto mb-3">
+                          <Car className="w-8 h-8 text-white" />
+                        </div>
+                        <p className="text-white font-medium">VEHICLE 3D MODEL</p>
+                        <p className="text-[#5a5a6e] text-xs mt-1">car.glb will be available after creation</p>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={handleAddCar} disabled={!carForm.title.trim() || !carForm.caseId.trim()}
+                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-red-500/20 transition-all">
+                    Add Car Evidence
+                  </button>
+                </div>
+              )}
+
+              {modalType === 'image' && (
+                <div className="space-y-4">
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Title *</label>
+                    <input type="text" value={imageForm.title} onChange={(e) => setImageForm({...imageForm, title: e.target.value})}
+                      placeholder="Image evidence title..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                  </div>
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Image URL *</label>
+                    <input type="text" value={imageForm.imageUrl} onChange={(e) => setImageForm({...imageForm, imageUrl: e.target.value})}
+                      placeholder="https://..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                  </div>
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Image Title</label>
+                    <input type="text" value={imageForm.imageTitle} onChange={(e) => setImageForm({...imageForm, imageTitle: e.target.value})}
+                      placeholder="Caption..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                  </div>
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Description</label>
+                    <textarea value={imageForm.description} onChange={(e) => setImageForm({...imageForm, description: e.target.value})}
+                      placeholder="Image description..." rows={3} className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none resize-none" />
+                  </div>
+                  <button onClick={handleAddImage} disabled={!imageForm.title.trim() || !imageForm.caseId.trim()}
+                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-red-500/20 transition-all">
+                    Add Image Evidence
+                  </button>
+                </div>
+              )}
+
+              {modalType === 'document' && (
+                <div className="space-y-4">
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Title *</label>
+                    <input type="text" value={documentForm.title} onChange={(e) => setDocumentForm({...documentForm, title: e.target.value})}
+                      placeholder="Document title..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
+                  </div>
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Description</label>
+                    <textarea value={documentForm.description} onChange={(e) => setDocumentForm({...documentForm, description: e.target.value})}
+                      placeholder="Document description..." rows={3} className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none resize-none" />
+                  </div>
+                  <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Custom Fields (JSON)</label>
+                    <textarea value={documentForm.customFields} onChange={(e) => setDocumentForm({...documentForm, customFields: e.target.value})}
+                      placeholder='{"field1": "value1"}' rows={3} className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none resize-none font-mono text-sm" />
+                  </div>
+                  <button onClick={handleAddDocument} disabled={!documentForm.title.trim() || !documentForm.caseId.trim()}
+                    className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-red-500/20 transition-all">
+                    Add Document Evidence
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-green-500/30 rounded-2xl p-8 max-w-md w-full shadow-2xl shadow-green-500/10">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
+                  <Check className="w-8 h-8 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Success!</h3>
+                  <p className="text-green-400 text-sm">{successMessage}</p>
+                </div>
               </div>
-              <div>
-                <label className="text-[#7E8299] text-sm font-medium block mb-2">Case ID *</label>
-                <input type="text" value={newEvidence.caseId} onChange={(e) => setNewEvidence({ ...newEvidence, caseId: e.target.value })}
-                  placeholder="Case ID..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
-              </div>
-              <button onClick={handleAddEvidence} disabled={!newEvidence.title.trim() || !newEvidence.caseId.trim()}
-                className="w-full py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-red-500/20">
-                Add Evidence
+              <button onClick={() => setShowSuccessModal(false)} 
+                className="w-full py-3 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-xl text-green-400 font-medium transition-all">
+                Continue
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedEvidence && !show3DViewer && (
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            className="fixed right-0 top-0 bottom-0 w-[450px] bg-gradient-to-br from-[#1a1a22] to-[#12121a] border-l border-[#2a2a35] shadow-2xl z-40 overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${typeColors[selectedEvidence.evidenceType].bg} flex items-center justify-center`}>
+                    {(() => {
+                    const IconComponent = typeIcons[selectedEvidence.evidenceType]
+                    return IconComponent ? <IconComponent className="w-6 h-6 text-white" /> : null
+                  })()}
+                  </div>
+                  <div>
+                    <span className="text-xs text-[#5a5a6e] uppercase">{selectedEvidence.evidenceType} Evidence</span>
+                    <p className="text-[#7E8299] text-xs">ID: {selectedEvidence.id.slice(0, 8)}...</p>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedEvidence(null)} className="text-[#5a5a6e] hover:text-white">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <h2 className="text-2xl font-bold text-white mb-6">{selectedEvidence.title}</h2>
+
+              <div className="space-y-4">
+                <div className="bg-[#0f0f14] rounded-xl p-4">
+                  <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Description</h4>
+                  <p className="text-white text-sm">{selectedEvidence.description}</p>
+                </div>
+
+                {selectedEvidence.weapon && (
+                  <div className="bg-[#0f0f14] rounded-xl p-4">
+                    <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Weapon Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><p className="text-[#5a5a6e] text-xs">Type</p><p className="text-white text-sm capitalize">{selectedEvidence.weapon.weaponType}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Brand</p><p className="text-white text-sm">{selectedEvidence.weapon.brand || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Serial Number</p><p className="text-white text-sm">{selectedEvidence.weapon.serialNumber || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Caliber</p><p className="text-white text-sm">{selectedEvidence.weapon.caliber || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Owner</p><p className="text-white text-sm">{selectedEvidence.weapon.owner || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Organ Evidence</p><p className="text-white text-sm">{selectedEvidence.weapon.organ ? 'Yes' : 'No'}</p></div>
+                    </div>
+                    <button onClick={() => setShow3DViewer(true)} 
+                      className="mt-4 w-full py-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium flex items-center justify-center gap-2">
+                      <Eye className="w-4 h-4" />View 3D Model
+                    </button>
+                  </div>
+                )}
+
+                {selectedEvidence.car && (
+                  <div className="bg-[#0f0f14] rounded-xl p-4">
+                    <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Vehicle Details</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><p className="text-[#5a5a6e] text-xs">Make</p><p className="text-white text-sm">{selectedEvidence.car.make || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Model</p><p className="text-white text-sm">{selectedEvidence.car.model || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Plate</p><p className="text-white text-sm">{selectedEvidence.car.plateNumber || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Color</p><p className="text-white text-sm">{selectedEvidence.car.color || 'Unknown'}</p></div>
+                      <div><p className="text-[#5a5a6e] text-xs">Owner</p><p className="text-white text-sm">{selectedEvidence.car.owner || 'Unknown'}</p></div>
+                    </div>
+                    <button onClick={() => setShow3DViewer(true)} 
+                      className="mt-4 w-full py-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium flex items-center justify-center gap-2">
+                      <Eye className="w-4 h-4" />View 3D Model
+                    </button>
+                  </div>
+                )}
+
+                {selectedEvidence.imageEvidence && (
+                  <div className="bg-[#0f0f14] rounded-xl p-4">
+                    <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Image Details</h4>
+                    {selectedEvidence.imageEvidence.imageUrl && (
+                      <div className="mb-3 rounded-lg overflow-hidden">
+                        <img src={selectedEvidence.imageEvidence.imageUrl} alt={selectedEvidence.imageEvidence.imageTitle || 'Evidence'} className="w-full h-48 object-cover" />
+                      </div>
+                    )}
+                    <p className="text-[#5a5a6e] text-xs">Title</p><p className="text-white text-sm">{selectedEvidence.imageEvidence.imageTitle || 'N/A'}</p>
+                  </div>
+                )}
+
+                {selectedEvidence.document && (
+                  <div className="bg-[#0f0f14] rounded-xl p-4">
+                    <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Document Details</h4>
+                    {selectedEvidence.document.customFields && (
+                      <div className="bg-[#1a1a22] rounded-lg p-3 font-mono text-xs text-[#7E8299]">
+                        {selectedEvidence.document.customFields}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="bg-[#0f0f14] rounded-xl p-4">
+                  <h4 className="text-[#7E8299] text-xs font-medium uppercase mb-3">Metadata</h4>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between"><span className="text-[#5a5a6e]">Classification</span><span className="text-red-400">{selectedEvidence.classification}</span></div>
+                    <div className="flex justify-between"><span className="text-[#5a5a6e]">Case ID</span><span className="text-white">{selectedEvidence.caseId.slice(0, 8)}...</span></div>
+                    <div className="flex justify-between"><span className="text-[#5a5a6e]">Created</span><span className="text-white">{new Date(selectedEvidence.createdAt).toLocaleString()}</span></div>
+                  </div>
+                </div>
+
+                <button onClick={() => handleDeleteEvidence(selectedEvidence)}
+                  className="w-full py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium flex items-center justify-center gap-2">
+                  <Trash2 className="w-4 h-4" />Delete Evidence
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

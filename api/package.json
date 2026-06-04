@@ -25,13 +25,13 @@
     "framer-motion": "^12.40.0",
     "ioredis": "^5.11.0",
     "lucide-react": "^1.16.0",
-    "prisma": "^6.19.3",
     "reactflow": "^11.11.4",
     "socket.io": "^4.8.3",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "prisma": "^6.19.3",
     "tsx": "^4.22.3",
     "typescript": "^6.0.3"
   }
