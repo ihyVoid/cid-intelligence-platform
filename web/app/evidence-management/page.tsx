@@ -392,12 +392,12 @@ export default function EvidenceManagementPage() {
               </div>
               <div className="h-[calc(100%-64px)]">
                 <EvidenceViewer3D 
-                  modelPath={get3DModel(selectedEvidence) || ''}
-                  evidence={selectedEvidence}
+                  evidenceType={selectedEvidence.evidenceType}
+                  weaponType={selectedEvidence.weapon?.weaponType === 'rifle' ? 'rifle' : 'pistol'}
                   hotspots={[
-                    { position: [0, 0, 0.5], label: 'Point 1', info: 'Primary inspection point' },
-                    { position: [0.3, 0.2, 0.3], label: 'Point 2', info: 'Secondary details' },
-                    { position: [-0.2, -0.1, 0.4], label: 'Point 3', info: 'Additional information' },
+                    { position: [0, 0, 0.5], label: 'Point 1', details: { 'Info': 'Primary inspection point' } },
+                    { position: [0.3, 0.2, 0.3], label: 'Point 2', details: { 'Info': 'Secondary details' } },
+                    { position: [-0.2, -0.1, 0.4], label: 'Point 3', details: { 'Info': 'Additional information' } },
                   ]}
                 />
               </div>

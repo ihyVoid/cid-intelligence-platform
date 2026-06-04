@@ -109,7 +109,7 @@ export default function CaseDetailPage() {
       yPos += 8
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      caseData.suspects.forEach(s => {
+      caseData.suspects.forEach((s: any) => {
         doc.text(`- ${s.fullName} (Threat: ${s.threatLevel}, Status: ${s.status})`, 20, yPos)
         yPos += 6
       })
@@ -123,7 +123,7 @@ export default function CaseDetailPage() {
       yPos += 8
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      caseData.evidences.forEach(e => {
+      caseData.evidences.forEach((e: any) => {
         doc.text(`- ${e.title}: ${e.description}`, 20, yPos)
         yPos += 6
       })
@@ -137,7 +137,7 @@ export default function CaseDetailPage() {
       yPos += 8
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
-      caseData.timelineEvents.forEach(t => {
+      caseData.timelineEvents.forEach((t: any) => {
         doc.text(`[${t.eventTime}] ${t.title}: ${t.description}`, 20, yPos)
         yPos += 6
       })

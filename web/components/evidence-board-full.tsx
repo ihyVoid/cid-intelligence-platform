@@ -178,19 +178,21 @@ export function EvidenceBoardFull({ boardId = 'main-case' }: EvidenceBoardFullPr
 
   const onConnect = useCallback(async (params: Connection) => {
     if (!params.source || !params.target) return
+    const source = params.source as string
+    const target = params.target as string
     try {
       const response = await axios.post(`${API_URL}/graph/edge`, {
         boardId,
-        source: params.source,
-        target: params.target,
+        source,
+        target,
         label: '',
         animated: true
       })
       
       setEdges(prev => [...prev, {
-        id: response.data.id,
-        source: params.source,
-        target: params.target,
+        id: response.data.id as string,
+        source,
+        target,
         animated: true,
         label: '',
         style: { stroke: '#6366f1', strokeWidth: 2 },

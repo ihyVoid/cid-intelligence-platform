@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Stage, Html, useTexture, Environment } from '@react-three/drei'
+import { OrbitControls, Stage, Html, useTexture, Environment, useGLTF } from '@react-three/drei'
 import { X, Maximize2, RotateCcw, Info, ChevronRight } from 'lucide-react'
 import * as THREE from 'three'
 
@@ -230,6 +230,20 @@ function GenericModel({ color = '#6366f1' }: { color?: string }) {
   )
 }
 
+// GLTF Model Loader for external .glb files
+function GLTFModel({ modelPath, hotspots }: { modelPath: string, hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> }) {
+  const { scene } = useGLTF(modelPath)
+  
+  return (
+    <group>
+      <primitive object={scene} />
+      {hotspots.map((hotspot, i) => (
+        <Hotspot key={i} {...hotspot} onClick={() => {}} />
+      ))}
+    </group>
+  )
+}
+
 // Main 3D Viewer Component
 interface EvidenceViewer3DProps {
   evidenceType: 'weapon' | 'car' | 'image' | 'document'
@@ -246,6 +260,18 @@ export function EvidenceViewer3D({
 }: EvidenceViewer3DProps) {
   const [autoRotate, setAutoRotate] = useState(true)
   const [showHelp, setShowHelp] = useState(true)
+  const [modelError, setModelError] = useState(false)
+
+  // Get model path based on type
+  const getModelPath = () => {
+    if (evidenceType === 'weapon') {
+      return weaponType === 'rifle' ? '/rifle.glb' : '/pistol.glb'
+    }
+    if (evidenceType === 'car') return '/car.glb'
+    return null
+  }
+
+  const modelPath = getModelPath()
 
   return (
     <div className='fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-8'>
@@ -284,40 +310,52 @@ export function EvidenceViewer3D({
 
       {/* 3D Canvas */}
       <div className='w-full h-full'>
-        <Canvas shadows camera={{ position: [2, 2, 2], fov: 50 }}>
-          <color attach='background' args={['#0f0f14']} />
-          
-          <ambientLight intensity={0.4} />
-          <pointLight position={[10, 10, 10]} intensity={1} castShadow />
-          <pointLight position={[-10, -10, -10]} intensity={0.5} />
-          
-          <Suspense fallback={null}>
-            <Stage environment='city' intensity={0.5} contactShadow={false}>
-              {evidenceType === 'weapon' && weaponType === 'pistol' && (
-                <PistolModel hotspots={hotspots} />
-              )}
-              {evidenceType === 'weapon' && weaponType === 'rifle' && (
-                <RifleModel hotspots={hotspots} />
-              )}
-              {evidenceType === 'car' && (
-                <CarModel hotspots={hotspots} />
-              )}
-              {(evidenceType === 'image' || evidenceType === 'document') && (
-                <GenericModel />
-              )}
-            </Stage>
-          </Suspense>
-          
-          <OrbitControls 
-            autoRotate={autoRotate}
-            autoRotateSpeed={2}
-            enablePan={true}
-            enableZoom={true}
-            enableRotate={true}
-            minPolarAngle={0}
-            maxPolarAngle={Math.PI / 1.5}
-          />
-        </Canvas>
+        {modelPath && !modelError ? (
+          <Canvas shadows camera={{ position: [2, 2, 2], fov: 50 }} onCreated={({ gl }) => {
+            gl.setClearColor('#0f0f14')
+          }}>
+            <ambientLight intensity={0.4} />
+            <pointLight position={[10, 10, 10]} intensity={1} castShadow />
+            <pointLight position={[-10, -10, -10]} intensity={0.5} />
+            
+            <Suspense fallback={
+              <div className='flex items-center justify-center h-full'>
+                <div className='text-white'>Loading 3D model...</div>
+              </div>
+            }>
+              <Stage environment='city' intensity={0.5}>
+                <GLTFModel modelPath={modelPath} hotspots={hotspots} />
+              </Stage>
+            </Suspense>
+            
+            <OrbitControls 
+              autoRotate={autoRotate}
+              autoRotateSpeed={2}
+              enablePan={true}
+              enableZoom={true}
+              enableRotate={true}
+              minPolarAngle={0}
+              maxPolarAngle={Math.PI / 1.5}
+            />
+          </Canvas>
+        ) : (
+          <div className='flex items-center justify-center h-full'>
+            <div className='text-center'>
+              <div className='w-24 h-24 bg-[#2a2a35] rounded-xl flex items-center justify-center mx-auto mb-4'>
+                <Info className='w-12 h-12 text-[#5a5a6e]' />
+              </div>
+              <p className='text-white text-lg font-medium'>
+                {evidenceType === 'weapon' ? (weaponType === 'rifle' ? 'Rifle' : 'Pistol') : evidenceType === 'car' ? 'Vehicle' : 'Evidence'} 3D Model
+              </p>
+              <p className='text-[#5a5a6e] text-sm mt-2'>
+                {evidenceType === 'weapon' ? (weaponType === 'rifle' ? '/rifle.glb' : '/pistol.glb') : evidenceType === 'car' ? '/car.glb' : 'No 3D model available'}
+              </p>
+              <p className='text-[#3a3a45] text-xs mt-4'>
+                {modelError ? 'Error loading model' : '3D visualization'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Help Panel */}
