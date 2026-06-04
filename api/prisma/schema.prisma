@@ -212,6 +212,7 @@ model Evidence {
   description       String
   evidenceType      String
   classification    String
+  priority          String   @default("MEDIUM")
   createdBy         String
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -244,7 +245,6 @@ model WeaponEvidence {
   chainOfCustody    String?
   model3dUrl        String?
   model3dType       String?
-  organ             Boolean  @default(false)
   images            String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -389,5 +389,17 @@ model Relationship {
   label         String
   caseId        String
   case          Case @relation(fields: [caseId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model DeleteRequest {
+  id            String   @id @default(cuid())
+  entityType    String   // 'case', 'evidence', 'suspect', etc.
+  entityId      String
+  reason        String
+  requestedBy   String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedBy    String?
+  reviewedAt    DateTime?
   createdAt     DateTime @default(now())
 }

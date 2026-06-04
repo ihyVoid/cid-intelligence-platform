@@ -319,9 +319,9 @@ export function EvidenceViewer3D({
             <pointLight position={[-10, -10, -10]} intensity={0.5} />
             
             <Suspense fallback={
-              <div className='flex items-center justify-center h-full'>
+              <Html center>
                 <div className='text-white'>Loading 3D model...</div>
-              </div>
+              </Html>
             }>
               <Stage environment='city' intensity={0.5}>
                 <GLTFModel modelPath={modelPath} hotspots={hotspots} />

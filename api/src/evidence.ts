@@ -13,6 +13,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
           description: body.description || '',
           evidenceType: 'weapon',
           classification: body.classification || 'CONFIDENTIAL',
+          priority: body.priority || 'MEDIUM',
           createdBy: body.createdBy || 'admin',
           caseId: body.caseId || null
         }
@@ -22,20 +23,19 @@ export async function evidenceRoutes(app: FastifyInstance) {
         data: {
           evidenceId: evidence.id,
           weaponType: body.weaponType || 'pistol',
-          brand: body.brand,
-          model: body.model,
-          serialNumber: body.serialNumber,
-          caliber: body.caliber,
-          condition: body.condition,
-          quality: body.quality,
-          owner: body.owner,
-          registeredOwner: body.registeredOwner,
-          licenseStatus: body.licenseStatus,
-          seizedFrom: body.seizedFrom,
-          seizureLocation: body.seizureLocation,
-          seizureDate: body.seizureDate,
-          chainOfCustody: body.chainOfCustody,
-          organ: body.organ || false,
+          brand: body.brand || null,
+          model: body.model || null,
+          serialNumber: body.serialNumber || null,
+          caliber: body.caliber || null,
+          condition: body.condition || null,
+          quality: body.quality || null,
+          owner: body.owner || null,
+          registeredOwner: body.registeredOwner || null,
+          licenseStatus: body.licenseStatus || null,
+          seizedFrom: body.seizedFrom || null,
+          seizureLocation: body.seizureLocation || null,
+          seizureDate: body.seizureDate || null,
+          chainOfCustody: body.chainOfCustody || null,
           model3dType: body.weaponType || 'pistol'
         }
       })
@@ -57,6 +57,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
           description: body.description || '',
           evidenceType: 'car',
           classification: body.classification || 'CONFIDENTIAL',
+          priority: body.priority || 'MEDIUM',
           createdBy: body.createdBy || 'admin',
           caseId: body.caseId || null
         }
@@ -65,26 +66,26 @@ export async function evidenceRoutes(app: FastifyInstance) {
       const car = await prisma.carEvidence.create({
         data: {
           evidenceId: evidence.id,
-          vehicleType: body.vehicleType,
-          make: body.make,
-          model: body.model,
-          year: body.year,
-          trim: body.trim,
-          plateNumber: body.plateNumber,
-          plateState: body.plateState,
-          vin: body.vin,
-          color: body.color,
-          interiorColor: body.interiorColor,
-          bodyStyle: body.bodyStyle,
-          owner: body.owner,
-          registeredOwner: body.registeredOwner,
-          insuranceStatus: body.insuranceStatus,
-          condition: body.condition,
-          mileage: body.mileage,
-          damage: body.damage,
-          seizedFrom: body.seizedFrom,
-          seizureLocation: body.seizureLocation,
-          seizureDate: body.seizureDate,
+          vehicleType: body.vehicleType || null,
+          make: body.make || null,
+          model: body.model || null,
+          year: body.year ? parseInt(body.year) : null,
+          trim: body.trim || null,
+          plateNumber: body.plateNumber || null,
+          plateState: body.plateState || null,
+          vin: body.vin || null,
+          color: body.color || null,
+          interiorColor: body.interiorColor || null,
+          bodyStyle: body.bodyStyle || null,
+          owner: body.owner || null,
+          registeredOwner: body.registeredOwner || null,
+          insuranceStatus: body.insuranceStatus || null,
+          condition: body.condition || null,
+          mileage: body.mileage ? parseInt(body.mileage) : null,
+          damage: body.damage || null,
+          seizedFrom: body.seizedFrom || null,
+          seizureLocation: body.seizureLocation || null,
+          seizureDate: body.seizureDate || null,
           model3dType: 'car'
         }
       })
@@ -106,6 +107,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
           description: body.description || '',
           evidenceType: 'image',
           classification: body.classification || 'CONFIDENTIAL',
+          priority: body.priority || 'MEDIUM',
           createdBy: body.createdBy || 'admin',
           caseId: body.caseId || null
         }
@@ -147,6 +149,7 @@ export async function evidenceRoutes(app: FastifyInstance) {
           description: body.description || '',
           evidenceType: 'document',
           classification: body.classification || 'CONFIDENTIAL',
+          priority: body.priority || 'MEDIUM',
           createdBy: body.createdBy || 'admin',
           caseId: body.caseId || null
         }

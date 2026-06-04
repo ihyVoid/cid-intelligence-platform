@@ -5,6 +5,7 @@ import { userRoutes } from './users'
 import { caseRoutes } from './cases'
 import { evidenceRoutes } from './evidence'
 import { graphRoutes } from './graph'
+import { deleteRequestRoutes } from './delete-requests'
 
 const app = Fastify({ logger: true })
 
@@ -14,6 +15,7 @@ app.register(cors, {
 })
 app.register(userRoutes)
 app.register(evidenceRoutes)
+app.register(deleteRequestRoutes)
 app.register(jwt, {
   secret: 'super-secret-key'
 })

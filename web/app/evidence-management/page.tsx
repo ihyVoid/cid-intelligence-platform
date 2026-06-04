@@ -28,6 +28,7 @@ interface Evidence {
   description: string
   evidenceType: EvidenceType
   classification: string
+  priority: string
   createdAt: string
   weapon?: WeaponData
   car?: CarData
@@ -95,20 +96,26 @@ export default function EvidenceManagementPage() {
 
   const [weaponForm, setWeaponForm] = useState({
     weaponType: 'pistol' as 'pistol' | 'rifle',
-    model: '', serialNumber: '', owner: '', organ: false, brand: '', caliber: '', caseId: '', title: ''
+    model: '', serialNumber: '', owner: '', brand: '', caliber: '', caseId: '', title: '',
+    classification: 'CONFIDENTIAL', priority: 'MEDIUM'
   })
 
   const [carForm, setCarForm] = useState({
-    plateNumber: '', owner: '', color: '', model: '', make: '', caseId: '', title: ''
+    plateNumber: '', owner: '', color: '', model: '', make: '', caseId: '', title: '',
+    vehicleType: '', classification: 'CONFIDENTIAL', priority: 'MEDIUM'
   })
 
   const [imageForm, setImageForm] = useState({
-    imageUrl: '', imageTitle: '', description: '', caseId: '', title: ''
+    imageUrl: '', imageTitle: '', description: '', caseId: '', title: '',
+    classification: 'CONFIDENTIAL', priority: 'MEDIUM'
   })
 
   const [documentForm, setDocumentForm] = useState({
-    title: '', description: '', customFields: '', caseId: ''
+    title: '', description: '', customFields: '', caseId: '',
+    classification: 'CONFIDENTIAL', priority: 'MEDIUM'
   })
+
+  const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null)
 
   useEffect(() => {
     const userStr = localStorage.getItem('cid_user')
@@ -145,16 +152,20 @@ export default function EvidenceManagementPage() {
     try {
       await axios.post(`${API_URL}/evidence/weapon`, {
         caseId: weaponForm.caseId, title: weaponForm.title,
-        description: `Type: ${weaponForm.weaponType}\nModel: ${weaponForm.model}\nSerial: ${weaponForm.serialNumber}\nOwner: ${weaponForm.owner}\nOrgan: ${weaponForm.organ ? 'Yes' : 'No'}`,
-        classification: 'CONFIDENTIAL', weaponType: weaponForm.weaponType, model: weaponForm.model, serialNumber: weaponForm.serialNumber,
-        owner: weaponForm.owner, organ: weaponForm.organ, brand: weaponForm.brand, caliber: weaponForm.caliber
+        description: `Type: ${weaponForm.weaponType}\nModel: ${weaponForm.model}\nSerial: ${weaponForm.serialNumber}\nOwner: ${weaponForm.owner}\nBrand: ${weaponForm.brand}\nCaliber: ${weaponForm.caliber}`,
+        classification: weaponForm.classification, priority: weaponForm.priority,
+        weaponType: weaponForm.weaponType, model: weaponForm.model, serialNumber: weaponForm.serialNumber,
+        owner: weaponForm.owner, brand: weaponForm.brand, caliber: weaponForm.caliber
       })
       setSuccessMessage(`${weaponForm.weaponType.toUpperCase()} added successfully!`)
       setShowSuccessModal(true)
       setShowAddModal(false)
       resetForms()
       loadData()
-    } catch (error) { console.error('Error adding weapon:', error) }
+    } catch (error: any) { 
+      console.error('Error adding weapon:', error)
+      alert('Error: ' + (error.response?.data?.error || error.message))
+    }
   }
 
   const handleAddCar = async () => {
@@ -162,15 +173,20 @@ export default function EvidenceManagementPage() {
     try {
       await axios.post(`${API_URL}/evidence/car`, {
         caseId: carForm.caseId, title: carForm.title,
-        description: `Plate: ${carForm.plateNumber}\nOwner: ${carForm.owner}\nColor: ${carForm.color}\nModel: ${carForm.model}`,
-        classification: 'CONFIDENTIAL', plateNumber: carForm.plateNumber, owner: carForm.owner, color: carForm.color, model: carForm.model, make: carForm.make
+        description: `Plate: ${carForm.plateNumber}\nOwner: ${carForm.owner}\nColor: ${carForm.color}\nModel: ${carForm.model}\nMake: ${carForm.make}`,
+        classification: carForm.classification, priority: carForm.priority,
+        plateNumber: carForm.plateNumber, owner: carForm.owner, color: carForm.color, 
+        model: carForm.model, make: carForm.make, vehicleType: carForm.vehicleType
       })
       setSuccessMessage('Car evidence added successfully!')
       setShowSuccessModal(true)
       setShowAddModal(false)
       resetForms()
       loadData()
-    } catch (error) { console.error('Error adding car:', error) }
+    } catch (error: any) { 
+      console.error('Error adding car:', error)
+      alert('Error: ' + (error.response?.data?.error || error.message))
+    }
   }
 
   const handleAddImage = async () => {
@@ -204,10 +220,10 @@ export default function EvidenceManagementPage() {
   }
 
   const resetForms = () => {
-    setWeaponForm({ weaponType: 'pistol', model: '', serialNumber: '', owner: '', organ: false, brand: '', caliber: '', caseId: '', title: '' })
-    setCarForm({ plateNumber: '', owner: '', color: '', model: '', make: '', caseId: '', title: '' })
-    setImageForm({ imageUrl: '', imageTitle: '', description: '', caseId: '', title: '' })
-    setDocumentForm({ title: '', description: '', customFields: '', caseId: '' })
+    setWeaponForm({ weaponType: 'pistol', model: '', serialNumber: '', owner: '', brand: '', caliber: '', caseId: '', title: '', classification: 'CONFIDENTIAL', priority: 'MEDIUM' })
+    setCarForm({ plateNumber: '', owner: '', color: '', model: '', make: '', caseId: '', title: '', vehicleType: '', classification: 'CONFIDENTIAL', priority: 'MEDIUM' })
+    setImageForm({ imageUrl: '', imageTitle: '', description: '', caseId: '', title: '', classification: 'CONFIDENTIAL', priority: 'MEDIUM' })
+    setDocumentForm({ title: '', description: '', customFields: '', caseId: '', classification: 'CONFIDENTIAL', priority: 'MEDIUM' })
   }
 
   const handleDeleteEvidence = async (evidence: Evidence) => {
@@ -509,10 +525,30 @@ export default function EvidenceManagementPage() {
                       <input type="text" value={weaponForm.caliber} onChange={(e) => setWeaponForm({...weaponForm, caliber: e.target.value})}
                         placeholder="Caliber..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
                     </div>
-                    <div className="flex items-center gap-3 bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-4">
-                      <input type="checkbox" id="organ" checked={weaponForm.organ} onChange={(e) => setWeaponForm({...weaponForm, organ: e.target.checked})}
-                        className="w-5 h-5 rounded border-[#2a2a35] accent-red-500" />
-                      <label htmlFor="organ" className="text-white text-sm cursor-pointer">Organ Evidence</label>
+                    <div>
+                      <label className="text-[#7E8299] text-sm font-medium block mb-2">Classification</label>
+                      <select value={weaponForm.classification} onChange={(e) => setWeaponForm({...weaponForm, classification: e.target.value})}
+                        className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none">
+                        <option value="UNCLASSIFIED">UNCLASSIFIED</option>
+                        <option value="RESTRICTED">RESTRICTED</option>
+                        <option value="CONFIDENTIAL">CONFIDENTIAL</option>
+                        <option value="SECRET">SECRET</option>
+                        <option value="TOP SECRET">TOP SECRET</option>
+                        <option value="SCI">SCI</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[#7E8299] text-sm font-medium block mb-2">Priority</label>
+                      <select value={weaponForm.priority} onChange={(e) => setWeaponForm({...weaponForm, priority: e.target.value})}
+                        className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none">
+                        <option value="LOW">LOW</option>
+                        <option value="MEDIUM">MEDIUM</option>
+                        <option value="HIGH">HIGH</option>
+                        <option value="CRITICAL">CRITICAL</option>
+                        <option value="NATIONAL SECURITY">NATIONAL SECURITY</option>
+                      </select>
                     </div>
                   </div>
                   <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-4">

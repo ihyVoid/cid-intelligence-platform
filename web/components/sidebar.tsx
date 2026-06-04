@@ -78,7 +78,12 @@ export function Sidebar() {
       <div className='flex-1 p-3 space-y-1 overflow-y-auto'>
         {items.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+          // More specific matching - exact match or exact prefix for nested routes
+          const isActive = pathname === item.href || 
+            (item.href !== '/' && 
+             pathname.startsWith(item.href + '/') ||
+             (item.href === '/evidence' && pathname === '/evidence') ||
+             (item.href === '/evidence-management' && pathname === '/evidence-management'))
           
           return (
             <button
