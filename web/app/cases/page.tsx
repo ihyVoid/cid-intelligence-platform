@@ -57,6 +57,9 @@ export default function CasesPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
   const [selectedCase, setSelectedCase] = useState<CaseType | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [caseToDelete, setCaseToDelete] = useState<string | null>(null)
+  const [deleteReason, setDeleteReason] = useState('')
 
   useEffect(() => {
     const userStr = localStorage.getItem('cid_user')
@@ -76,14 +79,27 @@ export default function CasesPage() {
     setLoading(false)
   }
 
-  const handleDeleteCase = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this case?')) return
+  const handleDeleteClick = (id: string) => {
+    setCaseToDelete(id)
+    setDeleteReason('')
+    setShowDeleteModal(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!caseToDelete || !deleteReason.trim()) return
     try {
-      await axios.delete(`${API_URL}/cases/${id}`)
-      setCases(cases.filter(c => c.id !== id))
-      setSelectedCase(null)
+      await axios.post(`${API_URL}/delete-requests`, {
+        entityType: 'case',
+        entityId: caseToDelete,
+        reason: deleteReason,
+        requestedBy: 'admin'
+      })
+      setShowDeleteModal(false)
+      setCaseToDelete(null)
+      setDeleteReason('')
+      alert('Delete request submitted. An admin must approve this request.')
     } catch (error) {
-      console.error('Error deleting case:', error)
+      console.error('Error creating delete request:', error)
     }
   }
 
@@ -188,7 +204,7 @@ export default function CasesPage() {
                           className="p-1.5 bg-[#2a2a35] hover:bg-blue-500/20 rounded-lg text-[#5a5a6e] hover:text-blue-400">
                           <Eye className="w-4 h-4" />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteCase(c.id) }}
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteClick(c.id) }}
                           className="p-1.5 bg-[#2a2a35] hover:bg-red-500/20 rounded-lg text-[#5a5a6e] hover:text-red-400">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -269,11 +285,43 @@ export default function CasesPage() {
                   className="flex-1 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium flex items-center justify-center gap-2">
                   <Eye className="w-4 h-4" />View Details
                 </button>
-                <button onClick={() => handleDeleteCase(selectedCase.id)}
+                <button onClick={() => handleDeleteClick(selectedCase.id)}
                   className="flex-1 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl text-red-400 text-sm font-medium flex items-center justify-center gap-2">
                   <Trash2 className="w-4 h-4" />Delete
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Request Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gradient-to-br from-[#1a1a22] to-[#12121a] border border-[#2a2a35] rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white">Delete Request</h3>
+              <button onClick={() => setShowDeleteModal(false)} className="text-[#5a5a6e] hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <p className="text-[#7E8299] mb-4">Please provide a reason for this delete request. An admin must approve before deletion.</p>
+            <textarea
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="Enter reason for deletion..."
+              className="w-full h-32 px-4 py-3 bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl text-white outline-none resize-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2.5 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-xl text-white text-sm font-medium">
+                Cancel
+              </button>
+              <button onClick={handleConfirmDelete}
+                disabled={!deleteReason.trim()}
+                className="flex-1 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white text-sm font-medium">
+                Submit Request
+              </button>
             </div>
           </div>
         </div>

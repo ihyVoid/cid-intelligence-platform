@@ -18,8 +18,10 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  FileWarning
 } from 'lucide-react'
+import Link from 'next/link'
 
 interface User {
   id: string
@@ -131,7 +133,8 @@ export default function AdminPage() {
   const stats = {
     total: users.length,
     admins: users.filter(u => u.role === 'admin').length,
-    agents: users.filter(u => u.role === 'agent').length
+    agents: users.filter(u => u.role === 'agent').length,
+    owners: users.filter(u => u.role === 'owner').length
   }
 
   return (
@@ -150,7 +153,7 @@ export default function AdminPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="bg-[#1a1a22] border border-[#2a2a35] rounded-2xl p-5 hover:border-[#3a3a45] transition-colors">
           <div className="flex items-center justify-between">
             <div>
@@ -184,6 +187,19 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
+        <Link href="/admin/delete-requests">
+          <div className="bg-[#1a1a22] border border-[#2a2a35] rounded-2xl p-5 hover:border-yellow-500/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[#7E8299] text-sm mb-1">Delete Requests</p>
+                <p className="text-3xl font-bold">Manage</p>
+              </div>
+              <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center">
+                <FileWarning className="w-6 h-6 text-yellow-400" />
+              </div>
+            </div>
+          </div>
+        </Link>
       </div>
 
       <div className="grid grid-cols-3 gap-8">
