@@ -6,7 +6,7 @@ import { Topbar } from '@/components/topbar'
 import { EvidenceViewer3D } from '@/components/evidence-viewer-3d'
 import { 
   Plus, Search, Crosshair, Car, Image as ImageIcon, FileText, 
-  Trash2, Eye, X, Loader2, Package, RotateCcw, ChevronRight, Check
+  Trash2, Eye, X, Loader2, Package, RotateCcw, ChevronRight, Check, Bike
 } from 'lucide-react'
 import axios from 'axios'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -89,6 +89,7 @@ export default function EvidenceManagementPage() {
   const [modalType, setModalType] = useState<EvidenceType>('weapon')
   const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null)
   const [show3DViewer, setShow3DViewer] = useState(false)
+  const [vehicleType, setVehicleType] = useState<'car' | 'motorcycle'>('car')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [caseSearchQuery, setCaseSearchQuery] = useState('')
@@ -408,13 +409,13 @@ export default function EvidenceManagementPage() {
               </div>
               <div className="h-[calc(100%-64px)]">
                 <EvidenceViewer3D 
+                  isOpen={true}
+                  onClose={() => setShow3DViewer(false)}
                   evidenceType={selectedEvidence.evidenceType}
                   weaponType={selectedEvidence.weapon?.weaponType === 'rifle' ? 'rifle' : 'pistol'}
-                  hotspots={[
-                    { position: [0, 0, 0.5], label: 'Point 1', details: { 'Info': 'Primary inspection point' } },
-                    { position: [0.3, 0.2, 0.3], label: 'Point 2', details: { 'Info': 'Secondary details' } },
-                    { position: [-0.2, -0.1, 0.4], label: 'Point 3', details: { 'Info': 'Additional information' } },
-                  ]}
+                  vehicleType={vehicleType}
+                  setVehicleType={setVehicleType}
+                  evidenceData={selectedEvidence.weapon || selectedEvidence.car || {}}
                 />
               </div>
             </div>
@@ -585,42 +586,68 @@ export default function EvidenceManagementPage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
+                    <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Vehicle Type *</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={() => setCarForm({...carForm, vehicleType: 'car'})}
+                          className={`p-3 rounded-xl border text-sm font-medium transition-all ${carForm.vehicleType === 'car' || !carForm.vehicleType ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-[#2a2a35] text-[#7E8299]'}`}>
+                          <Car className="w-4 h-4 mx-auto mb-1" />CAR
+                        </button>
+                        <button onClick={() => setCarForm({...carForm, vehicleType: 'motorcycle'})}
+                          className={`p-3 rounded-xl border text-sm font-medium transition-all ${carForm.vehicleType === 'motorcycle' ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-[#2a2a35] text-[#7E8299]'}`}>
+                          <Bike className="w-4 h-4 mx-auto mb-1" />MOTORCYCLE
+                        </button>
+                      </div>
+                    </div>
                     <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Owner</label>
                       <input type="text" value={carForm.owner} onChange={(e) => setCarForm({...carForm, owner: e.target.value})}
                         placeholder="Owner name..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Color</label>
                       <input type="text" value={carForm.color} onChange={(e) => setCarForm({...carForm, color: e.target.value})}
                         placeholder="Color..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Make</label>
                       <input type="text" value={carForm.make} onChange={(e) => setCarForm({...carForm, make: e.target.value})}
                         placeholder="Toyota, BMW..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div><label className="text-[#7E8299] text-sm font-medium block mb-2">Model</label>
                       <input type="text" value={carForm.model} onChange={(e) => setCarForm({...carForm, model: e.target.value})}
                         placeholder="Model..." className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none" />
                     </div>
+                    <div>
+                      <label className="text-[#7E8299] text-sm font-medium block mb-2">Classification</label>
+                      <select value={carForm.classification} onChange={(e) => setCarForm({...carForm, classification: e.target.value})}
+                        className="w-full bg-[#0f0f14] border border-[#2a2a35] focus:border-red-500/50 rounded-xl px-4 py-3 text-white outline-none">
+                        <option value="UNCLASSIFIED">UNCLASSIFIED</option>
+                        <option value="RESTRICTED">RESTRICTED</option>
+                        <option value="CONFIDENTIAL">CONFIDENTIAL</option>
+                        <option value="SECRET">SECRET</option>
+                        <option value="TOP SECRET">TOP SECRET</option>
+                        <option value="SCI">SCI</option>
+                      </select>
+                    </div>
                   </div>
                   <div className="bg-[#0f0f14] border border-[#2a2a35] rounded-xl p-4">
                     <div className="flex items-center gap-2 text-[#7E8299] text-sm mb-3">
-                      <Eye className="w-4 h-4" /><span>3D Model: Vehicle</span>
+                      <Eye className="w-4 h-4" /><span>3D Model: {carForm.vehicleType === 'motorcycle' ? 'Motorcycle' : 'Car'}</span>
                     </div>
                     <div className="bg-[#1a1a22] rounded-lg p-6 flex items-center justify-center">
                       <div className="text-center">
-                        <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center mx-auto mb-3">
-                          <Car className="w-8 h-8 text-white" />
+                        <div className={`w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-3 ${carForm.vehicleType === 'motorcycle' ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-blue-500 to-blue-700'}`}>
+                          {carForm.vehicleType === 'motorcycle' ? <Bike className="w-8 h-8 text-white" /> : <Car className="w-8 h-8 text-white" />}
                         </div>
-                        <p className="text-white font-medium">VEHICLE 3D MODEL</p>
-                        <p className="text-[#5a5a6e] text-xs mt-1">car.glb will be available after creation</p>
+                        <p className="text-white font-medium">{carForm.vehicleType === 'motorcycle' ? 'MOTORCYCLE' : 'CAR'} 3D MODEL</p>
+                        <p className="text-[#5a5a6e] text-xs mt-1">{carForm.vehicleType === 'motorcycle' ? 'motorcycle.glb' : 'car.glb'} will be available after creation</p>
                       </div>
                     </div>
                   </div>
                   <button onClick={handleAddCar} disabled={!carForm.title.trim() || !carForm.caseId.trim()}
                     className="w-full py-3.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-white font-semibold shadow-lg shadow-red-500/20 transition-all">
-                    Add Car Evidence
+                    Add Vehicle Evidence
                   </button>
                 </div>
               )}
@@ -739,7 +766,6 @@ export default function EvidenceManagementPage() {
                       <div><p className="text-[#5a5a6e] text-xs">Serial Number</p><p className="text-white text-sm">{selectedEvidence.weapon.serialNumber || 'Unknown'}</p></div>
                       <div><p className="text-[#5a5a6e] text-xs">Caliber</p><p className="text-white text-sm">{selectedEvidence.weapon.caliber || 'Unknown'}</p></div>
                       <div><p className="text-[#5a5a6e] text-xs">Owner</p><p className="text-white text-sm">{selectedEvidence.weapon.owner || 'Unknown'}</p></div>
-                      <div><p className="text-[#5a5a6e] text-xs">Organ Evidence</p><p className="text-white text-sm">{selectedEvidence.weapon.organ ? 'Yes' : 'No'}</p></div>
                     </div>
                     <button onClick={() => setShow3DViewer(true)} 
                       className="mt-4 w-full py-2.5 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-xl text-blue-400 text-sm font-medium flex items-center justify-center gap-2">

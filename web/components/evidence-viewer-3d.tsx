@@ -1,307 +1,428 @@
 'use client'
 
-import { useState, Suspense, useRef } from 'react'
+import { useState, Suspense, useRef, useEffect, useMemo } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Stage, Html, useTexture, Environment, useGLTF } from '@react-three/drei'
-import { X, Maximize2, RotateCcw, Info, ChevronRight } from 'lucide-react'
+import { OrbitControls, Html, useGLTF } from '@react-three/drei'
+import { X, RotateCcw, Info, Car, Bike } from 'lucide-react'
 import * as THREE from 'three'
 
-// Hotspot component for interactive points on 3D model
-function Hotspot({ position, label, details, onClick }: {
+// Hotspot configuration for each model type with exact positions from user data
+const HOTSPOT_CONFIGS = {
+  pistol: [
+    { id: 'hotspot-1', position: [-0.128, 0.505, -0.134] as [number, number, number], label: 'Serial Number', labelKey: 'serialNumber' },
+    { id: 'hotspot-2', position: [0.711, -0.183, -0.154] as [number, number, number], label: 'Owner', labelKey: 'owner' },
+    { id: 'hotspot-3', position: [0.471, 0.631, -0.134] as [number, number, number], label: 'Model', labelKey: 'model' },
+  ],
+  rifle: [
+    { id: 'hotspot-3', position: [-0.3, 0.05, 0.05] as [number, number, number], label: 'Serial Number', labelKey: 'serialNumber' },
+    { id: 'hotspot-5', position: [0.36, -0.01, -0.01] as [number, number, number], label: 'Owner', labelKey: 'owner' },
+    { id: 'hotspot-7', position: [0.17, 0.20, -0.02] as [number, number, number], label: 'Model', labelKey: 'model' },
+  ],
+  car: [
+    { id: 'hotspot-1', position: [0.15, 0.5, 0.8] as [number, number, number], label: 'Plate', labelKey: 'plateNumber' },
+    { id: 'hotspot-2', position: [-0.48, 1.5, 0.26] as [number, number, number], label: 'Model', labelKey: 'model' },
+    { id: 'hotspot-3', position: [-1.56, 0.67, 0.06] as [number, number, number], label: 'Color', labelKey: 'color' },
+    { id: 'hotspot-6', position: [0.57, 1.9, 0.10] as [number, number, number], label: 'Owner', labelKey: 'owner' },
+  ],
+  motorcycle: [
+    { id: 'hotspot-1', position: [-1.15, -0.24, 0.85] as [number, number, number], label: 'Plate Number', labelKey: 'plateNumber' },
+    { id: 'hotspot-2', position: [-1.24, -0.13, 0.26] as [number, number, number], label: 'Owner', labelKey: 'owner' },
+    { id: 'hotspot-3', position: [-1.24, -0.07, -0.01] as [number, number, number], label: 'Color', labelKey: 'color' },
+    { id: 'hotspot-4', position: [-1.29, -0.03, -0.33] as [number, number, number], label: 'Model', labelKey: 'model' },
+  ]
+}
+
+// Hotspot 2D Circle Component with red color #EF232E
+function HotspotCircle({ 
+  position, 
+  label, 
+  value,
+  isActive, 
+  onClick,
+  scale = 1
+}: { 
   position: [number, number, number]
   label: string
-  details: Record<string, string>
+  value: string
+  isActive: boolean
   onClick: () => void
+  scale?: number
 }) {
+  const groupRef = useRef<THREE.Group>(null)
+  const ringRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
-  const [clicked, setClicked] = useState(false)
+  
+  useFrame((state) => {
+    if (ringRef.current) {
+      // Pulsing animation
+      const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.1 + 1
+      ringRef.current.scale.setScalar(pulse * scale)
+    }
+    if (groupRef.current) {
+      // Subtle floating animation
+      groupRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 2 + position[0]) * 0.02
+    }
+  })
 
   return (
-    <group position={position}>
-      {/* Hotspot sphere */}
-      <mesh
-        onClick={(e) => {
-          e.stopPropagation()
-          setClicked(!clicked)
-          onClick()
-        }}
-        onPointerOver={() => setHovered(true)}
-        onPointerOut={() => setHovered(false)}
-      >
-        <sphereGeometry args={[0.05, 16, 16]} />
-        <meshStandardMaterial 
-          color={clicked ? '#ef4444' : hovered ? '#fbbf24' : '#6366f1'} 
-          emissive={clicked ? '#ef4444' : hovered ? '#fbbf24' : '#6366f1'}
-          emissiveIntensity={hovered || clicked ? 0.5 : 0.2}
+    <group ref={groupRef} position={position}>
+      {/* Outer pulsing ring */}
+      <mesh ref={ringRef}>
+        <ringGeometry args={[0.08 * scale, 0.12 * scale, 32]} />
+        <meshBasicMaterial 
+          color='#EF232E' 
+          transparent 
+          opacity={hovered || isActive ? 0.8 : 0.4} 
+          side={THREE.DoubleSide}
         />
       </mesh>
       
-      {/* Pulsing ring */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.06, 0.08, 32]} />
-        <meshBasicMaterial color={clicked ? '#ef4444' : '#6366f1'} transparent opacity={0.5} />
+      {/* Inner circle - 2D disc */}
+      <mesh 
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick()
+        }}
+        onPointerOver={() => {
+          setHovered(true)
+          document.body.style.cursor = 'pointer'
+        }}
+        onPointerOut={() => {
+          setHovered(false)
+          document.body.style.cursor = 'auto'
+        }}
+      >
+        <circleGeometry args={[0.06 * scale, 32]} />
+        <meshBasicMaterial 
+          color='#EF232E' 
+          transparent 
+          opacity={hovered || isActive ? 1 : 0.85}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      
+      {/* Center dot */}
+      <mesh>
+        <circleGeometry args={[0.02 * scale, 16]} />
+        <meshBasicMaterial color='#ffffff' transparent opacity={0.9} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Label on hover */}
-      {hovered && (
-        <Html position={[0, 0.15, 0]} center>
-          <div className='bg-[#1a1a22] border border-[#2a2a35] rounded-lg px-3 py-1.5 shadow-xl'>
-            <p className='text-white text-xs font-medium'>{label}</p>
+      {/* Label tooltip on hover */}
+      {hovered && !isActive && (
+        <Html position={[0, 0.15 * scale, 0]} center>
+          <div className='bg-[#EF232E] text-white px-3 py-1.5 rounded-lg text-xs font-medium shadow-lg whitespace-nowrap'>
+            {label}
           </div>
         </Html>
       )}
-
-      {/* Details panel when clicked */}
-      {clicked && (
-        <Html position={[0.15, 0, 0]} center>
-          <div className='bg-[#1a1a22] border border-[#2a2a35] rounded-xl p-4 shadow-xl w-64'>
-            <h4 className='text-white font-semibold text-sm mb-2 flex items-center gap-2'>
-              <Info className='w-4 h-4 text-red-400' />
-              {label}
-            </h4>
-            <div className='space-y-2'>
-              {Object.entries(details).map(([key, value]) => (
-                <div key={key} className='flex justify-between gap-2'>
-                  <span className='text-[#7E8299] text-xs capitalize'>{key}:</span>
-                  <span className='text-white text-xs font-medium'>{value}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Html>
-      )}
     </group>
   )
 }
 
-// Pistol 3D Model
-function PistolModel({ hotspots }: { hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> }) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  
+// Infinite ground plane
+function InfiniteGround() {
   return (
-    <group ref={meshRef}>
-      {/* Main body */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[0.8, 0.15, 0.12]} />
-        <meshStandardMaterial color='#2a2a2a' metalness={0.8} roughness={0.3} />
-      </mesh>
-      
-      {/* Barrel */}
-      <mesh position={[0.5, 0, 0]}>
-        <cylinderGeometry args={[0.03, 0.03, 0.4, 16]} />
-        <meshStandardMaterial color='#1a1a1a' metalness={0.9} roughness={0.2} />
-      </mesh>
-      
-      {/* Handle/Grip */}
-      <mesh position={[-0.2, -0.15, 0]} rotation={[0, 0, 0.3]}>
-        <boxGeometry args={[0.12, 0.25, 0.1]} />
-        <meshStandardMaterial color='#3d2b1f' roughness={0.8} />
-      </mesh>
-      
-      {/* Trigger guard */}
-      <mesh position={[-0.05, -0.08, 0]} rotation={[0, 0, Math.PI / 6]}>
-        <torusGeometry args={[0.04, 0.01, 8, 16, Math.PI]} />
-        <meshStandardMaterial color='#2a2a2a' metalness={0.7} />
-      </mesh>
-      
-      {/* Slide */}
-      <mesh position={[0, 0.03, 0]}>
-        <boxGeometry args={[0.6, 0.05, 0.11]} />
-        <meshStandardMaterial color='#333333' metalness={0.8} roughness={0.2} />
-      </mesh>
-
-      {/* Add hotspots */}
-      {hotspots.map((hotspot, i) => (
-        <Hotspot key={i} {...hotspot} onClick={() => {}} />
-      ))}
-    </group>
-  )
-}
-
-// Rifle 3D Model
-function RifleModel({ hotspots }: { hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> }) {
-  return (
-    <group>
-      {/* Stock */}
-      <mesh position={[-0.5, 0, 0]}>
-        <boxGeometry args={[0.3, 0.08, 0.06]} />
-        <meshStandardMaterial color='#2a2a2a' metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Body/Receiver */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[0.8, 0.1, 0.08]} />
-        <meshStandardMaterial color='#333333' metalness={0.8} roughness={0.2} />
-      </mesh>
-      
-      {/* Barrel */}
-      <mesh position={[0.6, 0.02, 0]}>
-        <cylinderGeometry args={[0.02, 0.02, 0.6, 16]} />
-        <meshStandardMaterial color='#1a1a1a' metalness={0.9} roughness={0.1} />
-      </mesh>
-      
-      {/* Magazine */}
-      <mesh position={[0.1, -0.12, 0]}>
-        <boxGeometry args={[0.08, 0.2, 0.04]} />
-        <meshStandardMaterial color='#444444' metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Scope */}
-      <mesh position={[0, 0.08, 0]}>
-        <cylinderGeometry args={[0.025, 0.025, 0.3, 16]} />
-        <meshStandardMaterial color='#1a1a1a' metalness={0.6} roughness={0.4} />
-      </mesh>
-      
-      {/* Grip */}
-      <mesh position={[-0.1, -0.12, 0]} rotation={[0, 0, 0.2]}>
-        <boxGeometry args={[0.05, 0.12, 0.05]} />
-        <meshStandardMaterial color='#3d2b1f' roughness={0.8} />
-      </mesh>
-
-      {/* Add hotspots */}
-      {hotspots.map((hotspot, i) => (
-        <Hotspot key={i} {...hotspot} onClick={() => {}} />
-      ))}
-    </group>
-  )
-}
-
-// Car 3D Model
-function CarModel({ hotspots }: { hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> }) {
-  return (
-    <group scale={[0.5, 0.5, 0.5]}>
-      {/* Car body */}
-      <mesh position={[0, 0.15, 0]}>
-        <boxGeometry args={[1.8, 0.4, 0.8]} />
-        <meshStandardMaterial color='#1a1a2e' metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Cabin */}
-      <mesh position={[0.1, 0.4, 0]}>
-        <boxGeometry args={[1, 0.3, 0.7]} />
-        <meshStandardMaterial color='#2a2a3e' metalness={0.5} roughness={0.4} />
-      </mesh>
-      
-      {/* Hood */}
-      <mesh position={[0.7, 0.2, 0]}>
-        <boxGeometry args={[0.5, 0.15, 0.7]} />
-        <meshStandardMaterial color='#1a1a2e' metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Trunk */}
-      <mesh position={[-0.7, 0.2, 0]}>
-        <boxGeometry args={[0.4, 0.15, 0.7]} />
-        <meshStandardMaterial color='#1a1a2e' metalness={0.7} roughness={0.3} />
-      </mesh>
-      
-      {/* Wheels */}
-      {[[-0.5, 0, 0.45], [-0.5, 0, -0.45], [0.5, 0, 0.45], [0.5, 0, -0.45]].map((pos, i) => (
-        <mesh key={i} position={pos as [number, number, number]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-          <meshStandardMaterial color='#111111' roughness={0.9} />
-        </mesh>
-      ))}
-
-      {/* Headlights */}
-      <mesh position={[0.9, 0.15, 0.3]}>
-        <sphereGeometry args={[0.06, 16, 16]} />
-        <meshStandardMaterial color='#ffffaa' emissive='#ffff00' emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[0.9, 0.15, -0.3]}>
-        <sphereGeometry args={[0.06, 16, 16]} />
-        <meshStandardMaterial color='#ffffaa' emissive='#ffff00' emissiveIntensity={0.3} />
-      </mesh>
-
-      {/* Add hotspots */}
-      {hotspots.map((hotspot, i) => (
-        <Hotspot key={i} {...hotspot} onClick={() => {}} />
-      ))}
-    </group>
-  )
-}
-
-// Placeholder model for other types
-function GenericModel({ color = '#6366f1' }: { color?: string }) {
-  return (
-    <mesh>
-      <boxGeometry args={[0.5, 0.5, 0.5]} />
-      <meshStandardMaterial color={color} metalness={0.5} roughness={0.5} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
+      <planeGeometry args={[100, 100]} />
+      <meshStandardMaterial 
+        color='#1a1a22' 
+        transparent 
+        opacity={0.8}
+        roughness={0.9}
+        metalness={0.1}
+      />
     </mesh>
   )
 }
 
-// GLTF Model Loader for external .glb files
-function GLTFModel({ modelPath, hotspots }: { modelPath: string, hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> }) {
+// GLTF Model with hotspots
+function GLTFModelWithHotspots({ 
+  modelPath, 
+  hotspots, 
+  modelType,
+  evidenceData,
+  activeHotspot,
+  setActiveHotspot,
+  scale = 1
+}: { 
+  modelPath: string
+  hotspots: Array<{ id: string, position: [number, number, number], label: string, labelKey: string }>
+  modelType: string
+  evidenceData: any
+  activeHotspot: string | null
+  setActiveHotspot: (id: string | null) => void
+  scale?: number
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const [modelError, setModelError] = useState(false)
+  
   const { scene } = useGLTF(modelPath)
   
+  useFrame((state) => {
+    if (groupRef.current && !modelError) {
+      // Smooth auto rotation
+      groupRef.current.rotation.y = state.clock.elapsedTime * 0.3
+    }
+  })
+
+  // Handle model loading error
+  useEffect(() => {
+    try {
+      // Center and scale the model
+      const box = new THREE.Box3().setFromObject(scene)
+      const center = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      
+      // Reset position to center
+      scene.position.sub(center)
+      
+      // Scale to fit
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const scaleFactor = maxDim > 0 ? 2 / maxDim : 1
+      scene.scale.setScalar(scaleFactor * scale)
+      
+      // Move up so it sits on ground
+      scene.position.y = -size.y * scaleFactor / 2 + 0.2
+    } catch (e) {
+      setModelError(true)
+    }
+  }, [scene, scale])
+
+  if (modelError) {
+    return (
+      <group ref={groupRef} scale={0.5}>
+        <mesh position={[0, 0.15, 0]}>
+          <boxGeometry args={[1.8, 0.4, 0.8]} />
+          <meshStandardMaterial color='#2a2a3e' metalness={0.7} roughness={0.3} />
+        </mesh>
+        <mesh position={[0.1, 0.4, 0]}>
+          <boxGeometry args={[1, 0.3, 0.7]} />
+          <meshStandardMaterial color='#3a3a4e' metalness={0.5} roughness={0.4} />
+        </mesh>
+      </group>
+    )
+  }
+
   return (
-    <group>
+    <group ref={groupRef}>
       <primitive object={scene} />
-      {hotspots.map((hotspot, i) => (
-        <Hotspot key={i} {...hotspot} onClick={() => {}} />
+      
+      {/* Hotspots */}
+      {hotspots.map((hotspot) => {
+        const value = evidenceData[hotspot.labelKey] || 'N/A'
+        return (
+          <HotspotCircle
+            key={hotspot.id}
+            position={hotspot.position}
+            label={hotspot.label}
+            value={value}
+            isActive={activeHotspot === hotspot.id}
+            onClick={() => setActiveHotspot(activeHotspot === hotspot.id ? null : hotspot.id)}
+            scale={scale * 0.8}
+          />
+        )
+      })}
+    </group>
+  )
+}
+
+// Fallback placeholder model
+function PlaceholderModel({ type }: { type: string }) {
+  const groupRef = useRef<THREE.Group>(null)
+  
+  useFrame((state) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = state.clock.elapsedTime * 0.3
+    }
+  })
+
+  if (type === 'pistol' || type === 'rifle') {
+    return (
+      <group ref={groupRef}>
+        <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[0.8, 0.15, 0.12]} />
+          <meshStandardMaterial color='#2a2a2a' metalness={0.8} roughness={0.3} />
+        </mesh>
+        <mesh position={[0.5, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.03, 0.03, 0.4, 16]} />
+          <meshStandardMaterial color='#1a1a1a' metalness={0.9} roughness={0.2} />
+        </mesh>
+        <mesh position={[-0.2, -0.15, 0]} rotation={[0, 0, 0.3]}>
+          <boxGeometry args={[0.12, 0.25, 0.1]} />
+          <meshStandardMaterial color='#3d2b1f' roughness={0.8} />
+        </mesh>
+      </group>
+    )
+  }
+  
+  return (
+    <group ref={groupRef} scale={0.5}>
+      <mesh position={[0, 0.15, 0]}>
+        <boxGeometry args={[1.8, 0.4, 0.8]} />
+        <meshStandardMaterial color='#1a1a2e' metalness={0.7} roughness={0.3} />
+      </mesh>
+      <mesh position={[0.1, 0.4, 0]}>
+        <boxGeometry args={[1, 0.3, 0.7]} />
+        <meshStandardMaterial color='#2a2a3e' metalness={0.5} roughness={0.4} />
+      </mesh>
+      {([[-0.5, 0, 0.45], [-0.5, 0, -0.45], [0.5, 0, 0.45], [0.5, 0, -0.45]] as [number, number, number][]).map((pos, i) => (
+        <mesh key={i} position={pos} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
+          <meshStandardMaterial color='#111111' roughness={0.9} />
+        </mesh>
       ))}
     </group>
   )
 }
 
-// Main 3D Viewer Component
 interface EvidenceViewer3DProps {
+  isOpen: boolean
+  onClose: () => void
   evidenceType: 'weapon' | 'car' | 'image' | 'document'
   weaponType?: 'pistol' | 'rifle'
-  hotspots?: Array<{ position: [number, number, number], label: string, details: Record<string, string> }>
-  onClose?: () => void
+  vehicleType?: 'car' | 'motorcycle'
+  setVehicleType?: (type: 'car' | 'motorcycle') => void
+  evidenceData?: any
 }
 
-export function EvidenceViewer3D({ 
-  evidenceType, 
+// Main component
+export function EvidenceViewer3D({
+  isOpen,
+  onClose,
+  evidenceType,
   weaponType = 'pistol',
-  hotspots = [],
-  onClose 
+  vehicleType = 'car',
+  setVehicleType,
+  evidenceData = {}
 }: EvidenceViewer3DProps) {
   const [autoRotate, setAutoRotate] = useState(true)
-  const [showHelp, setShowHelp] = useState(true)
+  const [showHelp, setShowHelp] = useState(false)
+  const [activeHotspot, setActiveHotspot] = useState<string | null>(null)
   const [modelError, setModelError] = useState(false)
-
-  // Get model path based on type
+  const [hotspotInfo, setHotspotInfo] = useState<{ label: string; value: string } | null>(null)
+  
+  // Determine model path based on type
   const getModelPath = () => {
     if (evidenceType === 'weapon') {
       return weaponType === 'rifle' ? '/rifle.glb' : '/pistol.glb'
     }
-    if (evidenceType === 'car') return '/car.glb'
+    if (evidenceType === 'car') {
+      return vehicleType === 'motorcycle' ? '/motorcycle.glb' : '/car.glb'
+    }
     return null
   }
 
   const modelPath = getModelPath()
+  
+  // Get hotspots based on model type
+  const getHotspots = () => {
+    if (evidenceType === 'weapon') {
+      return HOTSPOT_CONFIGS[weaponType] || HOTSPOT_CONFIGS.pistol
+    }
+    if (evidenceType === 'car') {
+      return HOTSPOT_CONFIGS[vehicleType] || HOTSPOT_CONFIGS.car
+    }
+    return []
+  }
+
+  const hotspots = getHotspots()
+
+  // Handle canvas click to close hotspot
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.tagName === 'CANVAS') {
+      setActiveHotspot(null)
+      setHotspotInfo(null)
+    }
+  }
+
+  // Get active hotspot details
+  useEffect(() => {
+    if (activeHotspot) {
+      const hotspot = hotspots.find(h => h.id === activeHotspot)
+      if (hotspot) {
+        const value = evidenceData[hotspot.labelKey] || 'N/A'
+        setHotspotInfo({ label: hotspot.label, value })
+      }
+    } else {
+      setHotspotInfo(null)
+    }
+  }, [activeHotspot, hotspots, evidenceData])
+
+  // Keyboard close handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown)
+      return () => window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
 
   return (
-    <div className='fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-8'>
+    <div className='fixed inset-0 bg-[#0f0f14]/95 backdrop-blur-sm z-50 flex flex-col'>
       {/* Header */}
-      <div className='absolute top-6 left-6 right-6 flex items-center justify-between z-20'>
-        <div className='flex items-center gap-3'>
+      <div className='flex items-center justify-between px-6 py-4 border-b border-[#2a2a35]'>
+        <div className='flex items-center gap-4'>
           <div className='w-10 h-10 bg-gradient-to-br from-red-500 to-red-700 rounded-xl flex items-center justify-center'>
             <Info className='w-5 h-5 text-white' />
           </div>
           <div>
             <h2 className='text-white font-bold text-lg'>3D Evidence Viewer</h2>
-            <p className='text-[#7E8299] text-sm capitalize'>{evidenceType} Model</p>
+            <p className='text-[#7E8299] text-sm capitalize'>
+              {evidenceType === 'weapon' 
+                ? `${weaponType} - ${evidenceData.model || 'Unknown Model'}` 
+                : evidenceType === 'car' 
+                  ? `${vehicleType} - ${evidenceData.model || evidenceData.make || 'Unknown Vehicle'}` 
+                  : 'Evidence Model'}
+            </p>
           </div>
         </div>
-        <div className='flex items-center gap-2'>
+        
+        <div className='flex items-center gap-3'>
+          {/* Vehicle type selector for car evidence */}
+          {evidenceType === 'car' && setVehicleType && (
+            <div className='flex items-center gap-2 bg-[#1a1a22] rounded-xl p-1'>
+              <button
+                onClick={() => setVehicleType('car')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  vehicleType === 'car' 
+                    ? 'bg-[#EF232E]/20 text-[#EF232E] border border-[#EF232E]/30' 
+                    : 'text-[#7E8299] hover:text-white'
+                }`}
+              >
+                <Car className='w-4 h-4' /> Car
+              </button>
+              <button
+                onClick={() => setVehicleType('motorcycle')}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  vehicleType === 'motorcycle' 
+                    ? 'bg-[#EF232E]/20 text-[#EF232E] border border-[#EF232E]/30' 
+                    : 'text-[#7E8299] hover:text-white'
+                }`}
+              >
+                <Bike className='w-4 h-4' /> Motorcycle
+              </button>
+            </div>
+          )}
+          
           <button 
             onClick={() => setAutoRotate(!autoRotate)}
-            className={`p-2 rounded-lg transition-all ${autoRotate ? 'bg-red-500 text-white' : 'bg-[#2a2a35] text-[#7E8299]'}`}
+            className={`p-2.5 rounded-xl transition-all ${autoRotate ? 'bg-[#EF232E] text-white' : 'bg-[#2a2a35] text-[#7E8299] hover:text-white'}`}
+            title={autoRotate ? 'Stop rotation' : 'Auto rotate'}
           >
-            <RotateCcw className='w-5 h-5' />
+            <RotateCcw className={`w-5 h-5 ${autoRotate ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
           </button>
-          <button 
-            onClick={() => setShowHelp(!showHelp)}
-            className={`px-4 py-2 rounded-lg text-sm transition-all ${showHelp ? 'bg-red-500/20 text-red-400' : 'bg-[#2a2a35] text-[#7E8299]'}`}
-          >
-            {showHelp ? 'Hide Help' : 'Show Help'}
-          </button>
+          
           <button 
             onClick={onClose}
-            className='p-2 bg-[#2a2a35] hover:bg-red-500/20 rounded-lg text-[#7E8299] hover:text-red-400 transition-all'
+            className='p-2.5 bg-[#2a2a35] hover:bg-[#EF232E]/20 rounded-xl text-[#7E8299] hover:text-[#EF232E] transition-all'
+            title='Close (ESC)'
           >
             <X className='w-5 h-5' />
           </button>
@@ -309,190 +430,128 @@ export function EvidenceViewer3D({
       </div>
 
       {/* 3D Canvas */}
-      <div className='w-full h-full'>
-        {modelPath && !modelError ? (
-          <Canvas shadows camera={{ position: [2, 2, 2], fov: 50 }} onCreated={({ gl }) => {
-            gl.setClearColor('#0f0f14')
-          }}>
-            <ambientLight intensity={0.4} />
-            <pointLight position={[10, 10, 10]} intensity={1} castShadow />
-            <pointLight position={[-10, -10, -10]} intensity={0.5} />
+      <div className='flex-1 relative' onClick={handleCanvasClick}>
+        {modelPath ? (
+          <Canvas 
+            camera={{ position: [0, 1, 3], fov: 45 }} 
+            onCreated={({ gl }) => {
+              gl.setClearColor('#0f0f14')
+            }}
+          >
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} intensity={1} />
+            <pointLight position={[-10, -10, -10]} intensity={0.3} />
+            <pointLight position={[0, 5, 0]} intensity={0.5} />
             
             <Suspense fallback={
               <Html center>
-                <div className='text-white'>Loading 3D model...</div>
+                <div className='bg-[#1a1a22] border border-[#2a2a35] rounded-xl px-6 py-4 shadow-2xl'>
+                  <div className='flex items-center gap-3'>
+                    <div className='w-5 h-5 border-2 border-[#EF232E] border-t-transparent rounded-full animate-spin' />
+                    <span className='text-white'>Loading 3D model...</span>
+                  </div>
+                </div>
               </Html>
             }>
-              <Stage environment='city' intensity={0.5}>
-                <GLTFModel modelPath={modelPath} hotspots={hotspots} />
-              </Stage>
+              <GLTFModelWithHotspots
+                modelPath={modelPath}
+                hotspots={hotspots}
+                modelType={evidenceType === 'weapon' ? weaponType : vehicleType}
+                evidenceData={evidenceData}
+                activeHotspot={activeHotspot}
+                setActiveHotspot={setActiveHotspot}
+                scale={1}
+              />
+              <InfiniteGround />
             </Suspense>
             
             <OrbitControls 
               autoRotate={autoRotate}
-              autoRotateSpeed={2}
+              autoRotateSpeed={1.5}
               enablePan={true}
               enableZoom={true}
               enableRotate={true}
-              minPolarAngle={0}
-              maxPolarAngle={Math.PI / 1.5}
+              minPolarAngle={0.2}
+              maxPolarAngle={Math.PI / 2 - 0.1}
+              target={[0, 0, 0]}
             />
           </Canvas>
         ) : (
           <div className='flex items-center justify-center h-full'>
             <div className='text-center'>
-              <div className='w-24 h-24 bg-[#2a2a35] rounded-xl flex items-center justify-center mx-auto mb-4'>
+              <div className='w-24 h-24 bg-[#2a2a35] rounded-2xl flex items-center justify-center mx-auto mb-4'>
                 <Info className='w-12 h-12 text-[#5a5a6e]' />
               </div>
-              <p className='text-white text-lg font-medium'>
-                {evidenceType === 'weapon' ? (weaponType === 'rifle' ? 'Rifle' : 'Pistol') : evidenceType === 'car' ? 'Vehicle' : 'Evidence'} 3D Model
-              </p>
-              <p className='text-[#5a5a6e] text-sm mt-2'>
-                {evidenceType === 'weapon' ? (weaponType === 'rifle' ? '/rifle.glb' : '/pistol.glb') : evidenceType === 'car' ? '/car.glb' : 'No 3D model available'}
-              </p>
-              <p className='text-[#3a3a45] text-xs mt-4'>
-                {modelError ? 'Error loading model' : '3D visualization'}
-              </p>
+              <p className='text-white text-lg font-medium'>No 3D Model Available</p>
+              <p className='text-[#5a5a6e] text-sm mt-2'>3D visualization is not available for this evidence type</p>
             </div>
           </div>
         )}
+
+        {/* Hotspot Info Panel */}
+        {hotspotInfo && (
+          <div className='absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#EF232E] rounded-2xl px-6 py-4 shadow-2xl shadow-[#EF232E]/20 min-w-72'>
+            <div className='flex items-center gap-3'>
+              <div className='w-3 h-3 bg-[#EF232E] rounded-full' />
+              <span className='text-[#7E8299] text-sm'>{hotspotInfo.label}:</span>
+              <span className='text-white font-semibold text-lg'>{hotspotInfo.value}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Help Panel */}
+        {showHelp && (
+          <div className='absolute bottom-6 right-6 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl p-4 shadow-xl'>
+            <h3 className='text-white font-semibold text-sm mb-3'>Controls</h3>
+            <div className='space-y-2 text-sm'>
+              <div className='flex items-center gap-2 text-[#7E8299]'>
+                <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>LMB</span>
+                <span>Rotate</span>
+              </div>
+              <div className='flex items-center gap-2 text-[#7E8299]'>
+                <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>RMB</span>
+                <span>Pan</span>
+              </div>
+              <div className='flex items-center gap-2 text-[#7E8299]'>
+                <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>Scroll</span>
+                <span>Zoom</span>
+              </div>
+              <div className='flex items-center gap-2 text-[#7E8299]'>
+                <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>ESC</span>
+                <span>Close</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hotspot indicator */}
+        {hotspots.length > 0 && (
+          <div className='absolute top-6 right-6 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2 shadow-xl'>
+            <div className='flex items-center gap-2'>
+              <span className='w-3 h-3 bg-[#EF232E] rounded-full animate-pulse' />
+              <span className='text-white text-sm font-medium'>{hotspots.length}</span>
+              <span className='text-[#7E8299] text-sm'>hotspots</span>
+            </div>
+          </div>
+        )}
+
+        {/* Help toggle button */}
+        <button 
+          onClick={() => setShowHelp(!showHelp)}
+          className='absolute top-6 left-6 px-4 py-2 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl text-[#7E8299] hover:text-white hover:border-[#3a3a45] transition-all text-sm'
+        >
+          {showHelp ? 'Hide Help' : 'Show Help'}
+        </button>
       </div>
-
-      {/* Help Panel */}
-      {showHelp && (
-        <div className='absolute bottom-6 left-6 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl p-4 shadow-xl max-w-sm'>
-          <h3 className='text-white font-semibold text-sm mb-3'>Controls</h3>
-          <div className='space-y-2 text-sm'>
-            <div className='flex items-center gap-2 text-[#7E8299]'>
-              <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>LMB</span>
-              <span>Rotate view</span>
-            </div>
-            <div className='flex items-center gap-2 text-[#7E8299]'>
-              <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>RMB</span>
-              <span>Pan view</span>
-            </div>
-            <div className='flex items-center gap-2 text-[#7E8299]'>
-              <span className='w-6 h-6 bg-[#2a2a35] rounded flex items-center justify-center text-xs'>Scroll</span>
-              <span>Zoom in/out</span>
-            </div>
-            <div className='flex items-center gap-2 text-[#7E8299] mt-3 pt-2 border-t border-[#2a2a35]'>
-              <span className='w-3 h-3 bg-blue-500 rounded-full' />
-              <span>Click blue dots to view details</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Hotspot count indicator */}
-      {hotspots.length > 0 && (
-        <div className='absolute bottom-6 right-6 bg-[#1a1a22]/95 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2 shadow-xl'>
-          <div className='flex items-center gap-2'>
-            <span className='w-2 h-2 bg-blue-500 rounded-full animate-pulse' />
-            <span className='text-white text-sm font-medium'>{hotspots.length}</span>
-            <span className='text-[#7E8299] text-sm'>hotspots</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-// Generate hotspots for weapon
+// Export helper functions for generating hotspots
 export function generateWeaponHotspots(data: any, type: string) {
-  const hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> = []
-  
-  if (type === 'pistol') {
-    // Serial number position
-    if (data.serialNumber) {
-      hotspots.push({
-        position: [0.3, 0, 0.07],
-        label: 'Serial Number',
-        details: { Serial: data.serialNumber, 'Registered To': data.registeredOwner || 'Unknown' }
-      })
-    }
-    // Brand/Model
-    if (data.brand || data.model) {
-      hotspots.push({
-        position: [0, 0.05, 0],
-        label: 'Brand & Model',
-        details: { Brand: data.brand || 'Unknown', Model: data.model || 'Unknown' }
-      })
-    }
-    // Caliber
-    if (data.caliber) {
-      hotspots.push({
-        position: [0.5, 0.03, 0],
-        label: 'Caliber',
-        details: { Caliber: data.caliber, 'License Status': data.licenseStatus || 'Unknown' }
-      })
-    }
-  } else if (type === 'rifle') {
-    // Serial number
-    if (data.serialNumber) {
-      hotspots.push({
-        position: [-0.3, 0.05, 0.05],
-        label: 'Serial Number',
-        details: { Serial: data.serialNumber, 'Registered To': data.registeredOwner || 'Unknown' }
-      })
-    }
-    // Scope
-    hotspots.push({
-      position: [0, 0.08, 0],
-      label: 'Scope',
-      details: { 'Attached': 'Yes', 'Type': 'Reflex' }
-    })
-    // Magazine
-    if (data.magazineCapacity) {
-      hotspots.push({
-        position: [0.1, -0.12, 0],
-        label: 'Magazine',
-        details: { 'Capacity': `${data.magazineCapacity} rounds`, 'Type': data.ammunitionType || 'Unknown' }
-      })
-    }
-  }
-  
-  return hotspots
+  return HOTSPOT_CONFIGS[type as keyof typeof HOTSPOT_CONFIGS] || HOTSPOT_CONFIGS.pistol
 }
 
-// Generate hotspots for car
-export function generateCarHotspots(data: any) {
-  const hotspots: Array<{ position: [number, number, number], label: string, details: Record<string, string> }> = []
-  
-  // Plate number
-  if (data.plateNumber) {
-    hotspots.push({
-      position: [0.9, 0.2, 0],
-      label: 'License Plate',
-      details: { 'Plate': data.plateNumber, 'State': data.plateState || 'Unknown' }
-    })
-  }
-  
-  // VIN
-  if (data.vin) {
-    hotspots.push({
-      position: [0.5, 0.15, 0.41],
-      label: 'VIN',
-      details: { 'VIN': data.vin.substring(0, 17), 'Year': data.year?.toString() || 'Unknown' }
-    })
-  }
-  
-  // Owner
-  if (data.owner || data.registeredOwner) {
-    hotspots.push({
-      position: [0.1, 0.45, 0],
-      label: 'Owner Information',
-      details: { 'Owner': data.owner || 'Unknown', 'Registered': data.registeredOwner || 'Unknown' }
-    })
-  }
-  
-  // Color
-  if (data.color) {
-    hotspots.push({
-      position: [-0.5, 0.2, 0.41],
-      label: 'Vehicle Color',
-      details: { 'Exterior': data.color, 'Interior': data.interiorColor || 'Unknown' }
-    })
-  }
-  
-  return hotspots
+export function generateCarHotspots(data: any, vehicleType: 'car' | 'motorcycle' = 'car') {
+  return HOTSPOT_CONFIGS[vehicleType] || HOTSPOT_CONFIGS.car
 }
