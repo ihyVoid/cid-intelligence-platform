@@ -172,7 +172,7 @@ function GLTFModel({
         groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
       }
       
-      // Report model center position in world space on hover
+      // Report model center position in world space on hover (always, even when not rotating)
       if (isHovered && onPositionChange) {
         const center = modelCenterRef.current.clone()
         // Apply group rotation to get world position
