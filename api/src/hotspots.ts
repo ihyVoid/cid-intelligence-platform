@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { prisma } from './prisma'
 
-export default async function hotspotsRoutes(fastify: FastifyInstance) {
+async function hotspotsRoutes(fastify: FastifyInstance) {
   // Get all hotspot templates
   fastify.get('/api/hotspots', async (request, reply) => {
     try {
@@ -111,3 +111,5 @@ export default async function hotspotsRoutes(fastify: FastifyInstance) {
     }
   })
 }
+
+export { hotspotsRoutes }
