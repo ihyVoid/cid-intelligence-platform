@@ -127,13 +127,17 @@ function GLTFModel({
       // Store model center for position tracking
       modelCenterRef.current.copy(center)
       
+      // Center the model at origin (subtract center from all positions)
+      clonedScene.position.sub(center)
+      
       // Normalize to exactly 2 units in max dimension
       const maxDim = Math.max(size.x, size.y, size.z)
       const scaleFactor = maxDim > 0 ? 2 / maxDim : 1
       clonedScene.scale.setScalar(scaleFactor)
       
       // Position on grid (y = 0 is grid level)
-      clonedScene.position.y = -box.min.y * scaleFactor + 0.01
+      // After centering, model bottom is at -size.y/2, so we offset by that amount
+      clonedScene.position.y = size.y * scaleFactor / 2 + 0.01
       
       // Make materials brighter
       clonedScene.traverse((child) => {
