@@ -107,38 +107,53 @@ function GLTFModel({
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const { scene } = useGLTF(modelPath)
+  const [modelScene, setModelScene] = useState<THREE.Group | null>(null)
   
   useEffect(() => {
     if (scene) {
-      const box = new THREE.Box3().setFromObject(scene)
+      // Clone scene to avoid modifying original
+      const clonedScene = scene.clone()
+      
+      const box = new THREE.Box3().setFromObject(clonedScene)
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       
-      scene.position.sub(center)
+      // Center the model
+      clonedScene.position.sub(center)
       
+      // Normalize to exactly 2 units in max dimension
       const maxDim = Math.max(size.x, size.y, size.z)
-      const scaleFactor = maxDim > 0 ? 1.5 / maxDim : 1
-      scene.scale.setScalar(scaleFactor)
+      const scaleFactor = maxDim > 0 ? 2 / maxDim : 1
+      clonedScene.scale.setScalar(scaleFactor)
       
-      scene.position.y = -size.y * scaleFactor / 2 + 0.2
+      // Position on grid (y = 0 is grid level, so model sits on grid)
+      clonedScene.position.y = -box.min.y * scaleFactor + 0.01
       
-      scene.traverse((child) => {
+      // Make materials brighter
+      clonedScene.traverse((child) => {
         if (child instanceof THREE.Mesh && child.material) {
           if (Array.isArray(child.material)) {
             child.material.forEach(mat => {
               if (mat.emissive) {
-                mat.emissive.setHex(0x333333)
-                mat.emissiveIntensity = 0.4
+                mat.emissive.setHex(0x444444)
+                mat.emissiveIntensity = 0.6
               }
+              if (mat.roughness !== undefined) mat.roughness = 0.5
+              if (mat.metalness !== undefined) mat.metalness = 0.3
             })
           } else {
             if (child.material.emissive) {
-              child.material.emissive.setHex(0x333333)
-              child.material.emissiveIntensity = 0.4
+              child.material.emissive.setHex(0x444444)
+              child.material.emissiveIntensity = 0.6
             }
+            if (child.material.roughness !== undefined) child.material.roughness = 0.5
+            if (child.material.metalness !== undefined) child.material.metalness = 0.3
           }
         }
       })
+      
+      // Update state with cloned scene
+      setModelScene(clonedScene)
     }
   }, [scene])
 
@@ -148,9 +163,19 @@ function GLTFModel({
     }
   })
 
+  if (!modelScene) {
+    return (
+      <Html center>
+        <div className='bg-black/50 rounded-lg px-4 py-2'>
+          <div className='w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin' />
+        </div>
+      </Html>
+    )
+  }
+
   return (
     <group ref={groupRef}>
-      <primitive object={scene} />
+      <primitive object={modelScene} />
       {hotspots.map((hotspot) => {
         const value = evidenceData[hotspot.labelKey] || 'N/A'
         return (
