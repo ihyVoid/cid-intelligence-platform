@@ -451,8 +451,6 @@ export default function Admin3DModelsPage() {
             color: 'Red',
             make: 'Toyota'
           }}
-          userRole='owner'
-          username='ihyVoid'
           customHotspots={hotspots}
         />
       )}

@@ -2,7 +2,7 @@
 
 import { useState, Suspense, useRef, useEffect } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, Html } from '@react-three/drei'
+import { OrbitControls, Html, Grid, useGLTF } from '@react-three/drei'
 import { X, RotateCcw, Info, Car, Bike, StopCircle } from 'lucide-react'
 import * as THREE from 'three'
 
@@ -40,71 +40,6 @@ export const DEFAULT_HOTSPOTS: Record<string, HotspotConfig[]> = {
   ],
 }
 
-// Simple placeholder model
-function PlaceholderModel({ type }: { type: string }) {
-  const groupRef = useRef<THREE.Group>(null)
-  
-  useFrame((state) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.3
-    }
-  })
-
-  if (type === 'pistol' || type === 'rifle') {
-    return (
-      <group ref={groupRef}>
-        {/* Body */}
-        <mesh position={[0, 0, 0]}>
-          <boxGeometry args={[0.8, 0.15, 0.12]} />
-          <meshStandardMaterial color='#444444' metalness={0.8} roughness={0.3} />
-        </mesh>
-        {/* Barrel */}
-        <mesh position={[0.5, 0, 0]} rotation={[0, 0, Math.PI/2]}>
-          <cylinderGeometry args={[0.03, 0.03, 0.4, 16]} />
-          <meshStandardMaterial color='#333333' metalness={0.9} roughness={0.2} />
-        </mesh>
-        {/* Handle */}
-        <mesh position={[-0.2, -0.12, 0]} rotation={[0, 0, 0.3]}>
-          <boxGeometry args={[0.12, 0.2, 0.1]} />
-          <meshStandardMaterial color='#5c4033' roughness={0.8} />
-        </mesh>
-      </group>
-    )
-  }
-
-  return (
-    <group ref={groupRef} scale={0.5}>
-      {/* Car body */}
-      <mesh position={[0, 0.15, 0]}>
-        <boxGeometry args={[1.8, 0.4, 0.8]} />
-        <meshStandardMaterial color='#2a2a3e' metalness={0.7} roughness={0.3} />
-      </mesh>
-      {/* Cabin */}
-      <mesh position={[0.1, 0.4, 0]}>
-        <boxGeometry args={[1, 0.3, 0.7]} />
-        <meshStandardMaterial color='#3a3a4e' metalness={0.5} roughness={0.4} />
-      </mesh>
-      {/* Wheels */}
-      <mesh position={[-0.5, 0, 0.45]} rotation={[Math.PI/2, 0, 0]}>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color='#111111' roughness={0.9} />
-      </mesh>
-      <mesh position={[-0.5, 0, -0.45]} rotation={[Math.PI/2, 0, 0]}>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color='#111111' roughness={0.9} />
-      </mesh>
-      <mesh position={[0.5, 0, 0.45]} rotation={[Math.PI/2, 0, 0]}>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color='#111111' roughness={0.9} />
-      </mesh>
-      <mesh position={[0.5, 0, -0.45]} rotation={[Math.PI/2, 0, 0]}>
-        <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
-        <meshStandardMaterial color='#111111' roughness={0.9} />
-      </mesh>
-    </group>
-  )
-}
-
 // Hotspot Circle Component
 function HotspotMarker({ 
   position, 
@@ -124,7 +59,6 @@ function HotspotMarker({
   
   useFrame((state) => {
     if (groupRef.current) {
-      // Pulse animation
       const scale = 1 + Math.sin(state.clock.elapsedTime * 3) * 0.15
       groupRef.current.scale.setScalar(scale)
     }
@@ -132,29 +66,20 @@ function HotspotMarker({
 
   return (
     <group ref={groupRef} position={position}>
-      {/* Outer ring */}
       <mesh
         onClick={(e) => { e.stopPropagation(); onClick() }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer' }}
         onPointerOut={(e) => { e.stopPropagation(); setHovered(false); document.body.style.cursor = 'auto' }}
       >
-        <circleGeometry args={[0.1, 32]} />
-        <meshBasicMaterial 
-          color='#EF232E' 
-          transparent 
-          opacity={hovered || isActive ? 1 : 0.8} 
-        />
+        <circleGeometry args={[0.08, 32]} />
+        <meshBasicMaterial color='#EF232E' transparent opacity={hovered || isActive ? 1 : 0.85} />
       </mesh>
-      
-      {/* Inner dot */}
       <mesh>
-        <circleGeometry args={[0.04, 16]} />
+        <circleGeometry args={[0.03, 16]} />
         <meshBasicMaterial color='#ffffff' />
       </mesh>
-
-      {/* Label on hover */}
       {hovered && !isActive && (
-        <Html position={[0, 0.2, 0]} center>
+        <Html position={[0, 0.18, 0]} center>
           <div className='bg-[#EF232E] text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap'>
             {label}
           </div>
@@ -164,16 +89,16 @@ function HotspotMarker({
   )
 }
 
-// Model wrapper with hotspots
-function ModelWithHotspots({ 
-  type,
+// GLTF Model with hotspots
+function GLTFModel({ 
+  modelPath, 
   hotspots, 
   evidenceData,
   activeHotspot,
   setActiveHotspot,
   isRotating
 }: { 
-  type: string
+  modelPath: string
   hotspots: HotspotConfig[]
   evidenceData: any
   activeHotspot: string | null
@@ -181,7 +106,42 @@ function ModelWithHotspots({
   isRotating: boolean
 }) {
   const groupRef = useRef<THREE.Group>(null)
+  const { scene } = useGLTF(modelPath)
   
+  useEffect(() => {
+    if (scene) {
+      const box = new THREE.Box3().setFromObject(scene)
+      const center = box.getCenter(new THREE.Vector3())
+      const size = box.getSize(new THREE.Vector3())
+      
+      scene.position.sub(center)
+      
+      const maxDim = Math.max(size.x, size.y, size.z)
+      const scaleFactor = maxDim > 0 ? 1.5 / maxDim : 1
+      scene.scale.setScalar(scaleFactor)
+      
+      scene.position.y = -size.y * scaleFactor / 2 + 0.2
+      
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach(mat => {
+              if (mat.emissive) {
+                mat.emissive.setHex(0x333333)
+                mat.emissiveIntensity = 0.4
+              }
+            })
+          } else {
+            if (child.material.emissive) {
+              child.material.emissive.setHex(0x333333)
+              child.material.emissiveIntensity = 0.4
+            }
+          }
+        }
+      })
+    }
+  }, [scene])
+
   useFrame((state) => {
     if (groupRef.current && isRotating) {
       groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
@@ -190,8 +150,7 @@ function ModelWithHotspots({
 
   return (
     <group ref={groupRef}>
-      <PlaceholderModel type={type} />
-      
+      <primitive object={scene} />
       {hotspots.map((hotspot) => {
         const value = evidenceData[hotspot.labelKey] || 'N/A'
         return (
@@ -217,10 +176,7 @@ interface EvidenceViewer3DProps {
   vehicleType?: 'car' | 'motorcycle'
   setVehicleType?: (type: 'car' | 'motorcycle') => void
   evidenceData?: any
-  userRole?: string
-  username?: string
   customHotspots?: HotspotConfig[]
-  onSaveHotspots?: (hotspots: HotspotConfig[]) => void
 }
 
 export function EvidenceViewer3D({
@@ -245,6 +201,17 @@ export function EvidenceViewer3D({
 
   const modelType = getModelType()
   
+  const getModelPath = () => {
+    if (evidenceType === 'weapon') {
+      return weaponType === 'rifle' ? '/rifle.glb' : '/pistol.glb'
+    }
+    if (evidenceType === 'car') {
+      return vehicleType === 'motorcycle' ? '/motorcycle.glb' : '/car.glb'
+    }
+    return null
+  }
+
+  const modelPath = getModelPath()
   const hotspots = customHotspots && customHotspots.length > 0 
     ? customHotspots 
     : DEFAULT_HOTSPOTS[modelType] || DEFAULT_HOTSPOTS.car
@@ -263,9 +230,7 @@ export function EvidenceViewer3D({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
+      if (e.key === 'Escape') onClose()
     }
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown)
@@ -281,9 +246,9 @@ export function EvidenceViewer3D({
   if (!isOpen) return null
 
   return (
-    <div className='fixed inset-0 bg-gradient-to-br from-[#0f0f14] to-[#1a1a2e] z-50 flex flex-col'>
+    <div className='fixed inset-0 bg-[#0a0a12] z-50 flex flex-col'>
       {/* Header */}
-      <div className='flex items-center justify-between px-6 py-4 bg-[#1a1a22]/80 backdrop-blur-md border-b border-[#2a2a35]'>
+      <div className='flex items-center justify-between px-6 py-4 bg-[#1a1a22]/90 backdrop-blur-md border-b border-[#2a2a35]'>
         <div className='flex items-center gap-4'>
           <div className='w-12 h-12 bg-gradient-to-br from-[#EF232E] to-[#c41b24] rounded-xl flex items-center justify-center shadow-lg'>
             <Info className='w-6 h-6 text-white' />
@@ -301,15 +266,12 @@ export function EvidenceViewer3D({
         </div>
         
         <div className='flex items-center gap-3'>
-          {/* Vehicle type selector */}
           {evidenceType === 'car' && setVehicleType && (
             <div className='flex items-center gap-1 bg-[#0f0f14] rounded-xl p-1'>
               <button
                 onClick={() => setVehicleType('car')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  vehicleType === 'car' 
-                    ? 'bg-[#EF232E] text-white' 
-                    : 'text-[#7E8299] hover:text-white hover:bg-[#2a2a35]'
+                  vehicleType === 'car' ? 'bg-[#EF232E] text-white' : 'text-[#7E8299] hover:text-white hover:bg-[#2a2a35]'
                 }`}
               >
                 <Car className='w-4 h-4' /> Car
@@ -317,9 +279,7 @@ export function EvidenceViewer3D({
               <button
                 onClick={() => setVehicleType('motorcycle')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  vehicleType === 'motorcycle' 
-                    ? 'bg-[#EF232E] text-white' 
-                    : 'text-[#7E8299] hover:text-white hover:bg-[#2a2a35]'
+                  vehicleType === 'motorcycle' ? 'bg-[#EF232E] text-white' : 'text-[#7E8299] hover:text-white hover:bg-[#2a2a35]'
                 }`}
               >
                 <Bike className='w-4 h-4' /> Motorcycle
@@ -327,28 +287,15 @@ export function EvidenceViewer3D({
             </div>
           )}
           
-          {/* Rotate button */}
           <button
             onClick={() => setIsRotating(!isRotating)}
-            className={`p-3 rounded-xl transition-all ${
-              isRotating 
-                ? 'bg-[#EF232E] text-white' 
-                : 'bg-[#2a2a35] text-[#7E8299] hover:text-white'
-            }`}
+            className={`p-3 rounded-xl transition-all ${isRotating ? 'bg-[#EF232E] text-white' : 'bg-[#2a2a35] text-[#7E8299] hover:text-white'}`}
             title={isRotating ? 'Stop Rotation' : 'Start Rotation'}
           >
-            {isRotating ? (
-              <StopCircle className='w-5 h-5' />
-            ) : (
-              <RotateCcw className='w-5 h-5' />
-            )}
+            {isRotating ? <StopCircle className='w-5 h-5' /> : <RotateCcw className='w-5 h-5' />}
           </button>
           
-          {/* Close button */}
-          <button 
-            onClick={onClose}
-            className='p-3 bg-[#2a2a35] hover:bg-red-500 rounded-xl text-[#7E8299] hover:text-white transition-all'
-          >
+          <button onClick={onClose} className='p-3 bg-[#2a2a35] hover:bg-red-500 rounded-xl text-[#7E8299] hover:text-white transition-all'>
             <X className='w-5 h-5' />
           </button>
         </div>
@@ -356,45 +303,62 @@ export function EvidenceViewer3D({
 
       {/* 3D Canvas */}
       <div className='flex-1 relative' onClick={handleCanvasClick}>
-        <Canvas 
-          camera={{ position: [0, 0.5, 4], fov: 50 }}
-          onCreated={({ gl }) => {
-            gl.setClearColor('#0f0f14')
-          }}
-        >
-          {/* Lighting */}
-          <ambientLight intensity={1} />
-          <directionalLight position={[5, 5, 5]} intensity={1.5} />
-          <directionalLight position={[-5, 3, -5]} intensity={0.8} />
-          <pointLight position={[0, 5, 0]} intensity={1} color='#ffffff' />
+        <Canvas camera={{ position: [0, 1, 4], fov: 45 }} gl={{ antialias: true, alpha: false }}>
+          {/* Background */}
+          <color attach='background' args={['#0a0a12']} />
+          
+          {/* Grid Floor */}
+          <Grid 
+            args={[20, 20]} 
+            position={[0, -0.5, 0]} 
+            cellSize={0.5}
+            cellThickness={0.5}
+            cellColor='#333344'
+            sectionSize={2}
+            sectionThickness={1}
+            sectionColor='#444466'
+            fadeDistance={25}
+            fadeStrength={1}
+            infiniteGrid={true}
+          />
+          
+          {/* Lighting - Bright scene */}
+          <ambientLight intensity={1.2} />
+          <directionalLight position={[5, 8, 5]} intensity={2} castShadow />
+          <directionalLight position={[-5, 3, -5]} intensity={1} color='#aabbff' />
+          <pointLight position={[0, 5, 0]} intensity={1.5} color='#ffffff' />
+          <pointLight position={[3, 2, 3]} intensity={0.8} color='#ffeecc' />
+          <pointLight position={[-3, 2, -3]} intensity={0.5} color='#ccddff' />
 
-          <Suspense fallback={
-            <Html center>
-              <div className='bg-[#1a1a22] rounded-xl px-6 py-4 shadow-xl'>
-                <div className='flex items-center gap-3'>
-                  <div className='w-5 h-5 border-2 border-[#EF232E] border-t-transparent rounded-full animate-spin' />
-                  <span className='text-white'>Loading...</span>
+          {modelPath && (
+            <Suspense fallback={
+              <Html center>
+                <div className='bg-[#1a1a22] rounded-xl px-6 py-4 shadow-xl'>
+                  <div className='flex items-center gap-3'>
+                    <div className='w-5 h-5 border-2 border-[#EF232E] border-t-transparent rounded-full animate-spin' />
+                    <span className='text-white'>Loading model...</span>
+                  </div>
                 </div>
-              </div>
-            </Html>
-          }>
-            <ModelWithHotspots
-              type={modelType}
-              hotspots={hotspots}
-              evidenceData={evidenceData}
-              activeHotspot={activeHotspot}
-              setActiveHotspot={setActiveHotspot}
-              isRotating={isRotating}
-            />
-          </Suspense>
+              </Html>
+            }>
+              <GLTFModel 
+                modelPath={modelPath}
+                hotspots={hotspots}
+                evidenceData={evidenceData}
+                activeHotspot={activeHotspot}
+                setActiveHotspot={setActiveHotspot}
+                isRotating={isRotating}
+              />
+            </Suspense>
+          )}
           
           <OrbitControls 
             autoRotate={false}
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
-            minPolarAngle={0.3}
-            maxPolarAngle={Math.PI - 0.3}
+            minPolarAngle={0.2}
+            maxPolarAngle={Math.PI / 2 + 0.2}
           />
         </Canvas>
 
@@ -413,7 +377,7 @@ export function EvidenceViewer3D({
         {hotspots.length > 0 && (
           <div className='absolute top-6 right-6 bg-[#1a1a22]/90 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2.5'>
             <div className='flex items-center gap-2'>
-              <span className='w-3 h-3 bg-[#EF232E] rounded-full' />
+              <span className='w-3 h-3 bg-[#EF232E] rounded-full animate-pulse' />
               <span className='text-white font-semibold'>{hotspots.length}</span>
               <span className='text-[#7E8299] text-sm'>hotspots</span>
             </div>
@@ -424,8 +388,8 @@ export function EvidenceViewer3D({
         <div className='absolute bottom-6 left-6 bg-[#1a1a22]/90 backdrop-blur-sm border border-[#2a2a35] rounded-xl p-4'>
           <h4 className='text-white font-semibold mb-2 text-sm'>Controls</h4>
           <div className='text-[#7E8299] text-xs space-y-1'>
-            <p>• Left click + drag: Rotate</p>
-            <p>• Right click + drag: Pan</p>
+            <p>• Left drag: Rotate</p>
+            <p>• Right drag: Pan</p>
             <p>• Scroll: Zoom</p>
             <p>• ESC: Close</p>
           </div>
