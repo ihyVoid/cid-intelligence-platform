@@ -111,6 +111,7 @@ function GLTFModel({
   const { scene } = useGLTF(modelPath)
   const [modelScene, setModelScene] = useState<THREE.Group | null>(null)
   const [isHovered, setIsHovered] = useState(false)
+  const modelCenterRef = useRef(new THREE.Vector3())
   
   useEffect(() => {
     if (scene) {
@@ -122,8 +123,8 @@ function GLTFModel({
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       
-      // Center the model at origin
-      clonedScene.position.sub(center)
+      // Store model center for position tracking
+      modelCenterRef.current.copy(center)
       
       // Normalize to exactly 2 units in max dimension
       const maxDim = Math.max(size.x, size.y, size.z)
@@ -158,7 +159,7 @@ function GLTFModel({
       
       setModelScene(clonedScene)
       
-      // Report position
+      // Report initial position (model center at origin)
       if (onPositionChange) {
         onPositionChange({ x: 0, y: 0, z: 0 })
       }
@@ -166,18 +167,25 @@ function GLTFModel({
   }, [scene, onPositionChange])
 
   useFrame((state) => {
-    if (groupRef.current && isRotating) {
-      groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
-    }
-    
-    // Report position on hover
-    if (isHovered && groupRef.current && onPositionChange) {
-      const pos = groupRef.current.position
-      onPositionChange({ 
-        x: Math.round(pos.x * 100) / 100, 
-        y: Math.round(pos.y * 100) / 100, 
-        z: Math.round(pos.z * 100) / 100 
-      })
+    if (groupRef.current) {
+      if (isRotating) {
+        groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
+      }
+      
+      // Report model center position in world space on hover
+      if (isHovered && onPositionChange) {
+        const center = modelCenterRef.current.clone()
+        // Apply group rotation to get world position
+        center.applyQuaternion(groupRef.current.quaternion)
+        // Add group position
+        center.add(groupRef.current.position)
+        
+        onPositionChange({ 
+          x: Math.round(center.x * 100) / 100, 
+          y: Math.round(center.y * 100) / 100, 
+          z: Math.round(center.z * 100) / 100 
+        })
+      }
     }
   })
 
