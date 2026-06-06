@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, Suspense, useRef, useEffect } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { useState, Suspense, useRef, useEffect, useCallback } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Html, Grid, useGLTF } from '@react-three/drei'
-import { X, RotateCcw, Info, Car, Bike, StopCircle } from 'lucide-react'
+import { X, RotateCcw, Info, Car, Bike, StopCircle, Move } from 'lucide-react'
 import * as THREE from 'three'
 
 // Hotspot type definition
@@ -96,7 +96,8 @@ function GLTFModel({
   evidenceData,
   activeHotspot,
   setActiveHotspot,
-  isRotating
+  isRotating,
+  onPositionChange
 }: { 
   modelPath: string
   hotspots: HotspotConfig[]
@@ -104,21 +105,24 @@ function GLTFModel({
   activeHotspot: string | null
   setActiveHotspot: (id: string | null) => void
   isRotating: boolean
+  onPositionChange?: (position: { x: number; y: number; z: number }) => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const { scene } = useGLTF(modelPath)
   const [modelScene, setModelScene] = useState<THREE.Group | null>(null)
+  const [isHovered, setIsHovered] = useState(false)
   
   useEffect(() => {
     if (scene) {
       // Clone scene to avoid modifying original
       const clonedScene = scene.clone()
       
+      // Calculate bounding box
       const box = new THREE.Box3().setFromObject(clonedScene)
       const center = box.getCenter(new THREE.Vector3())
       const size = box.getSize(new THREE.Vector3())
       
-      // Center the model
+      // Center the model at origin
       clonedScene.position.sub(center)
       
       // Normalize to exactly 2 units in max dimension
@@ -126,7 +130,7 @@ function GLTFModel({
       const scaleFactor = maxDim > 0 ? 2 / maxDim : 1
       clonedScene.scale.setScalar(scaleFactor)
       
-      // Position on grid (y = 0 is grid level, so model sits on grid)
+      // Position on grid (y = 0 is grid level)
       clonedScene.position.y = -box.min.y * scaleFactor + 0.01
       
       // Make materials brighter
@@ -152,14 +156,28 @@ function GLTFModel({
         }
       })
       
-      // Update state with cloned scene
       setModelScene(clonedScene)
+      
+      // Report position
+      if (onPositionChange) {
+        onPositionChange({ x: 0, y: 0, z: 0 })
+      }
     }
-  }, [scene])
+  }, [scene, onPositionChange])
 
   useFrame((state) => {
     if (groupRef.current && isRotating) {
       groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
+    }
+    
+    // Report position on hover
+    if (isHovered && groupRef.current && onPositionChange) {
+      const pos = groupRef.current.position
+      onPositionChange({ 
+        x: Math.round(pos.x * 100) / 100, 
+        y: Math.round(pos.y * 100) / 100, 
+        z: Math.round(pos.z * 100) / 100 
+      })
     }
   })
 
@@ -174,7 +192,11 @@ function GLTFModel({
   }
 
   return (
-    <group ref={groupRef}>
+    <group 
+      ref={groupRef}
+      onPointerOver={(e) => { e.stopPropagation(); setIsHovered(true); document.body.style.cursor = 'move' }}
+      onPointerOut={(e) => { e.stopPropagation(); setIsHovered(false); document.body.style.cursor = 'auto' }}
+    >
       <primitive object={modelScene} />
       {hotspots.map((hotspot) => {
         const value = evidenceData[hotspot.labelKey] || 'N/A'
@@ -217,6 +239,7 @@ export function EvidenceViewer3D({
   const [isRotating, setIsRotating] = useState(true)
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null)
   const [hotspotInfo, setHotspotInfo] = useState<{ label: string; value: string } | null>(null)
+  const [modelPosition, setModelPosition] = useState<{ x: number; y: number; z: number } | null>(null)
 
   const getModelType = () => {
     if (evidenceType === 'weapon') return weaponType
@@ -373,6 +396,7 @@ export function EvidenceViewer3D({
                 activeHotspot={activeHotspot}
                 setActiveHotspot={setActiveHotspot}
                 isRotating={isRotating}
+                onPositionChange={setModelPosition}
               />
             </Suspense>
           )}
@@ -409,10 +433,35 @@ export function EvidenceViewer3D({
           </div>
         )}
 
+        {/* Model Position Display */}
+        {modelPosition && (
+          <div className='absolute top-6 left-6 bg-[#1a1a22]/90 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-3'>
+            <div className='flex items-center gap-2 mb-2'>
+              <Move className='w-4 h-4 text-[#EF232E]' />
+              <span className='text-white font-semibold text-sm'>Position</span>
+            </div>
+            <div className='grid grid-cols-3 gap-2 text-xs'>
+              <div className='flex flex-col items-center'>
+                <span className='text-[#7E8299]'>X</span>
+                <span className='text-white font-mono'>{modelPosition.x}</span>
+              </div>
+              <div className='flex flex-col items-center'>
+                <span className='text-[#7E8299]'>Y</span>
+                <span className='text-white font-mono'>{modelPosition.y}</span>
+              </div>
+              <div className='flex flex-col items-center'>
+                <span className='text-[#7E8299]'>Z</span>
+                <span className='text-white font-mono'>{modelPosition.z}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Instructions */}
         <div className='absolute bottom-6 left-6 bg-[#1a1a22]/90 backdrop-blur-sm border border-[#2a2a35] rounded-xl p-4'>
           <h4 className='text-white font-semibold mb-2 text-sm'>Controls</h4>
           <div className='text-[#7E8299] text-xs space-y-1'>
+            <p>• Hover model: Shows position</p>
             <p>• Left drag: Rotate</p>
             <p>• Right drag: Pan</p>
             <p>• Scroll: Zoom</p>
