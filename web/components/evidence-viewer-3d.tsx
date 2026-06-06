@@ -118,7 +118,7 @@ function HotspotCircle({
   )
 }
 
-// GLTF Model with hotspots
+// GLTF Model with hotspots and good lighting
 function GLTFModelWithHotspots({ 
   modelPath, 
   hotspots, 
@@ -141,20 +141,41 @@ function GLTFModelWithHotspots({
   useEffect(() => {
     if (scene && !modelLoaded) {
       try {
+        // Center the model
         const box = new THREE.Box3().setFromObject(scene)
         const center = box.getCenter(new THREE.Vector3())
         const size = box.getSize(new THREE.Vector3())
         
         scene.position.sub(center)
         
+        // Scale to fit nicely
         const maxDim = Math.max(size.x, size.y, size.z)
-        const scaleFactor = maxDim > 0 ? 1.5 / maxDim : 1
+        const scaleFactor = maxDim > 0 ? 2 / maxDim : 1
         scene.scale.setScalar(scaleFactor)
         
-        scene.position.y = -size.y * scaleFactor / 2 + 0.3
+        // Position so model sits at y=0
+        scene.position.y = -size.y * scaleFactor / 2
+        
+        // Make all materials emissive for better visibility
+        scene.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => {
+                  mat.emissive = new THREE.Color(0x333333)
+                  mat.emissiveIntensity = 0.3
+                })
+              } else {
+                child.material.emissive = new THREE.Color(0x333333)
+                child.material.emissiveIntensity = 0.3
+              }
+            }
+          }
+        })
         
         setModelLoaded(true)
       } catch (e) {
+        console.error('Error loading model:', e)
         setModelError(true)
       }
     }
@@ -169,13 +190,13 @@ function GLTFModelWithHotspots({
   if (modelError) {
     return (
       <group ref={groupRef}>
-        <mesh position={[0, 0.15, 0]}>
-          <boxGeometry args={[1.2, 0.3, 0.5]} />
-          <meshStandardMaterial color='#3a3a4e' metalness={0.7} roughness={0.3} />
+        <mesh position={[0, 0.3, 0]}>
+          <boxGeometry args={[1, 0.4, 0.3]} />
+          <meshStandardMaterial color='#4a4a5e' metalness={0.5} roughness={0.5} emissive={0x222222} emissiveIntensity={0.3} />
         </mesh>
-        <mesh position={[0.1, 0.4, 0]}>
-          <boxGeometry args={[0.7, 0.25, 0.45]} />
-          <meshStandardMaterial color='#4a4a5e' metalness={0.5} roughness={0.4} />
+        <mesh position={[0.4, 0.3, 0]} rotation={[0, 0, Math.PI/2]}>
+          <cylinderGeometry args={[0.05, 0.05, 0.4, 16]} />
+          <meshStandardMaterial color='#333333' metalness={0.8} roughness={0.2} emissive={0x111111} emissiveIntensity={0.3} />
         </mesh>
       </group>
     )
@@ -282,7 +303,7 @@ export function EvidenceViewer3D({
   if (!isOpen) return null
 
   return (
-    <div className='fixed inset-0 bg-[#0a0a0f] z-50 flex flex-col'>
+    <div className='fixed inset-0 bg-[#1a1a2e] z-50 flex flex-col'>
       {/* Header */}
       <div className='flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#1a1a22] to-[#12121a] border-b border-[#2a2a35]'>
         <div className='flex items-center gap-4'>
@@ -345,20 +366,59 @@ export function EvidenceViewer3D({
         </div>
       </div>
 
-      {/* 3D Canvas */}
+      {/* 3D Canvas - Better lighting */}
       <div className='flex-1 relative' onClick={handleCanvasClick}>
         {modelPath ? (
           <Canvas 
-            camera={{ position: [0, 0.5, 3], fov: 50 }} 
+            camera={{ position: [0, 0.5, 4], fov: 50 }} 
             onCreated={({ gl }) => {
-              gl.setClearColor('#0a0a0f')
+              gl.setClearColor('#1a1a2e')
+              gl.toneMapping = THREE.ACESFilmicToneMapping
+              gl.toneMappingExposure = 1.5
             }}
           >
-            <ambientLight intensity={0.6} />
-            <pointLight position={[8, 8, 8]} intensity={1.2} />
-            <pointLight position={[-8, -8, -8]} intensity={0.4} />
-            <pointLight position={[0, 6, 0]} intensity={0.6} />
+            {/* Bright ambient light */}
+            <ambientLight intensity={1.5} color='#ffffff' />
             
+            {/* Main key light */}
+            <directionalLight 
+              position={[5, 5, 5]} 
+              intensity={2} 
+              color='#ffffff'
+              castShadow
+            />
+            
+            {/* Fill light */}
+            <directionalLight 
+              position={[-5, 3, -5]} 
+              intensity={1} 
+              color='#ccccff'
+            />
+            
+            {/* Rim light */}
+            <pointLight 
+              position={[0, 5, -5]} 
+              intensity={2} 
+              color='#EF232E'
+              distance={20}
+            />
+            
+            {/* Front fill */}
+            <pointLight 
+              position={[0, 2, 5]} 
+              intensity={1.5} 
+              color='#ffffff'
+              distance={15}
+            />
+            
+            {/* Bottom fill */}
+            <pointLight 
+              position={[0, -3, 0]} 
+              intensity={0.5} 
+              color='#333366'
+              distance={10}
+            />
+
             <Suspense fallback={
               <Html center>
                 <div className='bg-[#1a1a22] border border-[#2a2a35] rounded-2xl px-8 py-6 shadow-2xl'>
@@ -385,7 +445,7 @@ export function EvidenceViewer3D({
               enableZoom={true}
               enableRotate={true}
               minPolarAngle={0.3}
-              maxPolarAngle={Math.PI / 2 - 0.1}
+              maxPolarAngle={Math.PI - 0.3}
               target={[0, 0, 0]}
             />
           </Canvas>
