@@ -108,15 +108,16 @@ function GLTFModel({
   onPositionChange?: (position: { x: number; y: number; z: number }) => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
-  const { scene } = useGLTF(modelPath)
+  const { scene, raycaster, camera, pointer } = useThree()
+  const { scene: gltfScene } = useGLTF(modelPath)
   const [modelScene, setModelScene] = useState<THREE.Group | null>(null)
   const [isHovered, setIsHovered] = useState(false)
   const modelCenterRef = useRef(new THREE.Vector3())
   
   useEffect(() => {
-    if (scene) {
+    if (gltfScene) {
       // Clone scene to avoid modifying original
-      const clonedScene = scene.clone()
+      const clonedScene = gltfScene.clone()
       
       // Calculate bounding box
       const box = new THREE.Box3().setFromObject(clonedScene)
@@ -164,27 +165,27 @@ function GLTFModel({
         onPositionChange({ x: 0, y: 0, z: 0 })
       }
     }
-  }, [scene, onPositionChange])
+  }, [gltfScene, onPositionChange])
 
-  useFrame((state) => {
+  useFrame(() => {
     if (groupRef.current) {
       if (isRotating) {
-        groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
+        groupRef.current.rotation.y += 0.01 // Incremental rotation
       }
       
-      // Report model center position in world space on hover (always, even when not rotating)
-      if (isHovered && onPositionChange) {
-        const center = modelCenterRef.current.clone()
-        // Apply group rotation to get world position
-        center.applyQuaternion(groupRef.current.quaternion)
-        // Add group position
-        center.add(groupRef.current.position)
+      // Track actual mouse hover position on the model
+      if (isHovered && modelScene && onPositionChange) {
+        raycaster.setFromCamera(pointer, camera)
+        const intersects = raycaster.intersectObject(modelScene, true)
         
-        onPositionChange({ 
-          x: Math.round(center.x * 100) / 100, 
-          y: Math.round(center.y * 100) / 100, 
-          z: Math.round(center.z * 100) / 100 
-        })
+        if (intersects.length > 0) {
+          const point = intersects[0].point
+          onPositionChange({ 
+            x: Math.round(point.x * 100) / 100, 
+            y: Math.round(point.y * 100) / 100, 
+            z: Math.round(point.z * 100) / 100 
+          })
+        }
       }
     }
   })
