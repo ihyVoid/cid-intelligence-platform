@@ -1,35 +1,43 @@
 'use client'
 
 import { useState, Suspense, useRef, useEffect } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Html, useGLTF } from '@react-three/drei'
-import { X, RotateCcw, Info, Car, Bike } from 'lucide-react'
+import { X, RotateCcw, Info, Car, Bike, Plus, Trash2, Edit3, Eye, Save } from 'lucide-react'
 import * as THREE from 'three'
 
-// Hotspot configuration - positions from user's data (relative to model center)
-const HOTSPOT_CONFIGS = {
+// Hotspot type definition
+export interface HotspotConfig {
+  id: string
+  label: string
+  labelKey: string
+  position: [number, number, number]
+}
+
+// Default hotspots for each model type
+export const DEFAULT_HOTSPOTS: Record<string, HotspotConfig[]> = {
   pistol: [
-    { id: 'sn', position: [-0.05, 0.15, 0.08] as [number, number, number], label: 'Serial Number', labelKey: 'serialNumber' },
-    { id: 'owner', position: [0.15, -0.05, 0.08] as [number, number, number], label: 'Owner', labelKey: 'owner' },
-    { id: 'model', position: [0.05, 0.18, 0.08] as [number, number, number], label: 'Model', labelKey: 'model' },
+    { id: 'sn', label: 'Serial Number', labelKey: 'serialNumber', position: [-0.05, 0.15, 0.08] },
+    { id: 'owner', label: 'Owner', labelKey: 'owner', position: [0.15, -0.05, 0.08] },
+    { id: 'model', label: 'Model', labelKey: 'model', position: [0.05, 0.18, 0.08] },
   ],
   rifle: [
-    { id: 'sn', position: [-0.15, 0.15, 0.06] as [number, number, number], label: 'Serial Number', labelKey: 'serialNumber' },
-    { id: 'owner', position: [0.18, 0.02, 0.06] as [number, number, number], label: 'Owner', labelKey: 'owner' },
-    { id: 'model', position: [0.08, 0.22, 0.06] as [number, number, number], label: 'Model', labelKey: 'model' },
+    { id: 'sn', label: 'Serial Number', labelKey: 'serialNumber', position: [-0.15, 0.15, 0.06] },
+    { id: 'owner', label: 'Owner', labelKey: 'owner', position: [0.18, 0.02, 0.06] },
+    { id: 'model', label: 'Model', labelKey: 'model', position: [0.08, 0.22, 0.06] },
   ],
   car: [
-    { id: 'plate', position: [0.05, 0.3, 0.6] as [number, number, number], label: 'Plate', labelKey: 'plateNumber' },
-    { id: 'model', position: [-0.2, 0.8, 0.2] as [number, number, number], label: 'Model', labelKey: 'model' },
-    { id: 'color', position: [-0.8, 0.35, 0.05] as [number, number, number], label: 'Color', labelKey: 'color' },
-    { id: 'owner', position: [0.25, 1.0, 0.08] as [number, number, number], label: 'Owner', labelKey: 'owner' },
+    { id: 'plate', label: 'Plate', labelKey: 'plateNumber', position: [0.05, 0.3, 0.6] },
+    { id: 'model', label: 'Model', labelKey: 'model', position: [-0.2, 0.8, 0.2] },
+    { id: 'color', label: 'Color', labelKey: 'color', position: [-0.8, 0.35, 0.05] },
+    { id: 'owner', label: 'Owner', labelKey: 'owner', position: [0.25, 1.0, 0.08] },
   ],
   motorcycle: [
-    { id: 'plate', position: [-0.4, -0.1, 0.35] as [number, number, number], label: 'Plate Number', labelKey: 'plateNumber' },
-    { id: 'owner', position: [-0.45, -0.05, 0.1] as [number, number, number], label: 'Owner', labelKey: 'owner' },
-    { id: 'color', position: [-0.45, -0.02, -0.01] as [number, number, number], label: 'Color', labelKey: 'color' },
-    { id: 'model', position: [-0.48, 0.0, -0.15] as [number, number, number], label: 'Model', labelKey: 'model' },
-  ]
+    { id: 'plate', label: 'Plate Number', labelKey: 'plateNumber', position: [-0.4, -0.1, 0.35] },
+    { id: 'owner', label: 'Owner', labelKey: 'owner', position: [-0.45, -0.05, 0.1] },
+    { id: 'color', label: 'Color', labelKey: 'color', position: [-0.45, -0.02, -0.01] },
+    { id: 'model', label: 'Model', labelKey: 'model', position: [-0.48, 0.0, -0.15] },
+  ],
 }
 
 // Hotspot 2D Circle Component - red #EF232E
@@ -38,13 +46,19 @@ function HotspotCircle({
   label, 
   value,
   isActive, 
-  onClick
+  onClick,
+  isEditMode = false,
+  isSelected = false,
+  onSelect = () => {}
 }: { 
   position: [number, number, number]
   label: string
   value: string
   isActive: boolean
   onClick: () => void
+  isEditMode?: boolean
+  isSelected?: boolean
+  onSelect?: () => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const ringRef = useRef<THREE.Mesh>(null)
@@ -56,30 +70,44 @@ function HotspotCircle({
       const pulse = Math.sin(state.clock.elapsedTime * 2 + pulseOffset) * 0.15 + 1
       ringRef.current.scale.setScalar(pulse)
     }
-    if (groupRef.current) {
+    if (groupRef.current && !isEditMode) {
       groupRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.5 + pulseOffset) * 0.015
     }
   })
 
+  const handleClick = (e: any) => {
+    e.stopPropagation()
+    if (isEditMode) {
+      onSelect()
+    } else {
+      onClick()
+    }
+  }
+
   return (
     <group ref={groupRef} position={position}>
+      {/* Selection ring in edit mode */}
+      {isEditMode && isSelected && (
+        <mesh>
+          <ringGeometry args={[0.2, 0.25, 32]} />
+          <meshBasicMaterial color='#00ff00' transparent opacity={0.8} side={THREE.DoubleSide} />
+        </mesh>
+      )}
+      
       {/* Outer pulsing ring */}
-      <mesh ref={ringRef} rotation={[0, 0, 0]}>
+      <mesh ref={ringRef}>
         <ringGeometry args={[0.12, 0.18, 32]} />
         <meshBasicMaterial 
-          color='#EF232E' 
+          color={isEditMode ? '#00ff00' : '#EF232E'} 
           transparent 
           opacity={hovered || isActive ? 0.9 : 0.5} 
           side={THREE.DoubleSide}
         />
       </mesh>
       
-      {/* Inner circle - 2D disc */}
+      {/* Inner circle */}
       <mesh 
-        onClick={(e) => {
-          e.stopPropagation()
-          onClick()
-        }}
+        onClick={handleClick}
         onPointerOver={(e) => {
           e.stopPropagation()
           setHovered(true)
@@ -88,12 +116,12 @@ function HotspotCircle({
         onPointerOut={(e) => {
           e.stopPropagation()
           setHovered(false)
-          document.body.style.cursor = 'auto'
+          document.body.style.cursor = isEditMode ? 'pointer' : 'auto'
         }}
       >
         <circleGeometry args={[0.08, 32]} />
         <meshBasicMaterial 
-          color='#EF232E' 
+          color={isEditMode ? '#00ff00' : '#EF232E'} 
           transparent 
           opacity={hovered || isActive ? 1 : 0.9}
           side={THREE.DoubleSide}
@@ -106,10 +134,19 @@ function HotspotCircle({
         <meshBasicMaterial color='#ffffff' transparent opacity={0.95} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Label tooltip on hover */}
-      {hovered && !isActive && (
+      {/* Label tooltip */}
+      {hovered && !isActive && !isEditMode && (
         <Html position={[0, 0.25, 0]} center>
           <div className='bg-[#EF232E] text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-2xl whitespace-nowrap'>
+            {label}
+          </div>
+        </Html>
+      )}
+      
+      {/* Edit mode label */}
+      {isEditMode && (
+        <Html position={[0, 0.3, 0]} center>
+          <div className='bg-black/80 text-white px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap border border-green-500'>
             {label}
           </div>
         </Html>
@@ -118,58 +155,56 @@ function HotspotCircle({
   )
 }
 
-// GLTF Model with hotspots and good lighting
+// GLTF Model with hotspots
 function GLTFModelWithHotspots({ 
   modelPath, 
   hotspots, 
   evidenceData,
   activeHotspot,
   setActiveHotspot,
+  isEditMode = false,
+  selectedHotspotId,
+  onSelectHotspot,
+  onDragHotspot
 }: { 
   modelPath: string
-  hotspots: Array<{ id: string, position: [number, number, number], label: string, labelKey: string }>
+  hotspots: HotspotConfig[]
   evidenceData: any
   activeHotspot: string | null
   setActiveHotspot: (id: string | null) => void
+  isEditMode?: boolean
+  selectedHotspotId?: string | null
+  onSelectHotspot?: (id: string) => void
+  onDragHotspot?: (id: string, position: [number, number, number]) => void
 }) {
   const groupRef = useRef<THREE.Group>(null)
   const [modelError, setModelError] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(false)
+  const { camera } = useThree()
   
   const { scene } = useGLTF(modelPath)
   
   useEffect(() => {
     if (scene && !modelLoaded) {
       try {
-        // Center the model
         const box = new THREE.Box3().setFromObject(scene)
         const center = box.getCenter(new THREE.Vector3())
         const size = box.getSize(new THREE.Vector3())
         
         scene.position.sub(center)
         
-        // Scale to fit nicely
         const maxDim = Math.max(size.x, size.y, size.z)
         const scaleFactor = maxDim > 0 ? 2 / maxDim : 1
         scene.scale.setScalar(scaleFactor)
         
-        // Position so model sits at y=0
         scene.position.y = -size.y * scaleFactor / 2
         
-        // Make all materials emissive for better visibility
+        // Make materials emissive
         scene.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach(mat => {
-                  mat.emissive = new THREE.Color(0x333333)
-                  mat.emissiveIntensity = 0.3
-                })
-              } else {
-                child.material.emissive = new THREE.Color(0x333333)
-                child.material.emissiveIntensity = 0.3
-              }
-            }
+          if (child instanceof THREE.Mesh && child.material) {
+            const mat = child.material as THREE.MeshStandardMaterial
+            mat.emissive = new THREE.Color(0x333333)
+            mat.emissiveIntensity = 0.3
           }
         })
         
@@ -182,7 +217,7 @@ function GLTFModelWithHotspots({
   }, [scene, modelLoaded])
 
   useFrame((state) => {
-    if (groupRef.current && !modelError) {
+    if (groupRef.current && !modelError && !isEditMode) {
       groupRef.current.rotation.y = state.clock.elapsedTime * 0.4
     }
   })
@@ -193,10 +228,6 @@ function GLTFModelWithHotspots({
         <mesh position={[0, 0.3, 0]}>
           <boxGeometry args={[1, 0.4, 0.3]} />
           <meshStandardMaterial color='#4a4a5e' metalness={0.5} roughness={0.5} emissive={0x222222} emissiveIntensity={0.3} />
-        </mesh>
-        <mesh position={[0.4, 0.3, 0]} rotation={[0, 0, Math.PI/2]}>
-          <cylinderGeometry args={[0.05, 0.05, 0.4, 16]} />
-          <meshStandardMaterial color='#333333' metalness={0.8} roughness={0.2} emissive={0x111111} emissiveIntensity={0.3} />
         </mesh>
       </group>
     )
@@ -216,6 +247,9 @@ function GLTFModelWithHotspots({
             value={value}
             isActive={activeHotspot === hotspot.id}
             onClick={() => setActiveHotspot(activeHotspot === hotspot.id ? null : hotspot.id)}
+            isEditMode={isEditMode}
+            isSelected={selectedHotspotId === hotspot.id}
+            onSelect={() => onSelectHotspot?.(hotspot.id)}
           />
         )
       })}
@@ -231,6 +265,10 @@ interface EvidenceViewer3DProps {
   vehicleType?: 'car' | 'motorcycle'
   setVehicleType?: (type: 'car' | 'motorcycle') => void
   evidenceData?: any
+  userRole?: string
+  username?: string
+  customHotspots?: HotspotConfig[]
+  onSaveHotspots?: (hotspots: HotspotConfig[]) => void
 }
 
 export function EvidenceViewer3D({
@@ -240,12 +278,33 @@ export function EvidenceViewer3D({
   weaponType = 'pistol',
   vehicleType = 'car',
   setVehicleType,
-  evidenceData = {}
+  evidenceData = {},
+  userRole = 'agent',
+  username = '',
+  customHotspots,
+  onSaveHotspots
 }: EvidenceViewer3DProps) {
   const [autoRotate, setAutoRotate] = useState(true)
   const [showHelp, setShowHelp] = useState(false)
   const [activeHotspot, setActiveHotspot] = useState<string | null>(null)
   const [hotspotInfo, setHotspotInfo] = useState<{ label: string; value: string } | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null)
+  const [localHotspots, setLocalHotspots] = useState<HotspotConfig[]>([])
+  const [showHotspotList, setShowHotspotList] = useState(false)
+  const [newHotspotLabel, setNewHotspotLabel] = useState('')
+  const [newHotspotLabelKey, setNewHotspotLabelKey] = useState('')
+  
+  const isOwner = username === 'ihyVoid' || userRole === 'owner'
+  const canEditHotspots = isOwner && isEditMode
+
+  const getModelType = () => {
+    if (evidenceType === 'weapon') return weaponType
+    if (evidenceType === 'car') return vehicleType
+    return 'car'
+  }
+
+  const modelType = getModelType()
   
   const getModelPath = () => {
     if (evidenceType === 'weapon') {
@@ -259,21 +318,20 @@ export function EvidenceViewer3D({
 
   const modelPath = getModelPath()
   
-  const getHotspots = () => {
-    if (evidenceType === 'weapon') {
-      return HOTSPOT_CONFIGS[weaponType] || HOTSPOT_CONFIGS.pistol
+  // Initialize hotspots
+  useEffect(() => {
+    if (customHotspots && customHotspots.length > 0) {
+      setLocalHotspots(customHotspots)
+    } else {
+      setLocalHotspots(DEFAULT_HOTSPOTS[modelType] || DEFAULT_HOTSPOTS.car)
     }
-    if (evidenceType === 'car') {
-      return HOTSPOT_CONFIGS[vehicleType] || HOTSPOT_CONFIGS.car
-    }
-    return []
-  }
-
-  const hotspots = getHotspots()
+    setSelectedHotspotId(null)
+    setActiveHotspot(null)
+  }, [modelType, customHotspots])
 
   useEffect(() => {
     if (activeHotspot) {
-      const hotspot = hotspots.find(h => h.id === activeHotspot)
+      const hotspot = localHotspots.find(h => h.id === activeHotspot)
       if (hotspot) {
         const value = evidenceData[hotspot.labelKey] || 'N/A'
         setHotspotInfo({ label: hotspot.label, value })
@@ -281,23 +339,84 @@ export function EvidenceViewer3D({
     } else {
       setHotspotInfo(null)
     }
-  }, [activeHotspot, hotspots, evidenceData])
+  }, [activeHotspot, localHotspots, evidenceData])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        if (isEditMode) {
+          setIsEditMode(false)
+          setSelectedHotspotId(null)
+        } else {
+          onClose()
+        }
       }
     }
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown)
       return () => window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, onClose])
+  }, [isOpen, isEditMode, onClose])
 
   const handleCanvasClick = () => {
-    setActiveHotspot(null)
-    setHotspotInfo(null)
+    if (!isEditMode) {
+      setActiveHotspot(null)
+      setHotspotInfo(null)
+    }
+  }
+
+  const handleSelectHotspot = (id: string) => {
+    setSelectedHotspotId(id)
+  }
+
+  const handleAddHotspot = () => {
+    if (!newHotspotLabel.trim() || !newHotspotLabelKey.trim()) return
+    
+    const newId = `hs_${Date.now()}`
+    const newHotspot: HotspotConfig = {
+      id: newId,
+      label: newHotspotLabel.trim(),
+      labelKey: newHotspotLabelKey.trim(),
+      position: [0, 0.5, 0.5]
+    }
+    
+    const updated = [...localHotspots, newHotspot]
+    setLocalHotspots(updated)
+    setNewHotspotLabel('')
+    setNewHotspotLabelKey('')
+    setSelectedHotspotId(newId)
+    
+    if (onSaveHotspots) {
+      onSaveHotspots(updated)
+    }
+  }
+
+  const handleDeleteHotspot = (id: string) => {
+    const updated = localHotspots.filter(h => h.id !== id)
+    setLocalHotspots(updated)
+    setSelectedHotspotId(null)
+    
+    if (onSaveHotspots) {
+      onSaveHotspots(updated)
+    }
+  }
+
+  const handleResetHotspots = () => {
+    const defaults = DEFAULT_HOTSPOTS[modelType] || DEFAULT_HOTSPOTS.car
+    setLocalHotspots(defaults)
+    setSelectedHotspotId(null)
+    
+    if (onSaveHotspots) {
+      onSaveHotspots(defaults)
+    }
+  }
+
+  const handleSaveChanges = () => {
+    if (onSaveHotspots) {
+      onSaveHotspots(localHotspots)
+    }
+    setIsEditMode(false)
+    setSelectedHotspotId(null)
   }
 
   if (!isOpen) return null
@@ -323,6 +442,7 @@ export function EvidenceViewer3D({
         </div>
         
         <div className='flex items-center gap-3'>
+          {/* Vehicle type selector */}
           {evidenceType === 'car' && setVehicleType && (
             <div className='flex items-center gap-1 bg-[#0f0f14] rounded-xl p-1'>
               <button
@@ -348,6 +468,23 @@ export function EvidenceViewer3D({
             </div>
           )}
           
+          {/* Edit mode toggle for owner */}
+          {isOwner && (
+            <button
+              onClick={() => {
+                setIsEditMode(!isEditMode)
+                setSelectedHotspotId(null)
+              }}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isEditMode 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-[#2a2a35] text-[#7E8299] hover:text-white'
+              }`}
+            >
+              <Edit3 className='w-4 h-4' /> {isEditMode ? 'Exit Edit' : 'Edit Hotspots'}
+            </button>
+          )}
+          
           <button 
             onClick={() => setAutoRotate(!autoRotate)}
             className={`p-3 rounded-xl transition-all ${autoRotate ? 'bg-[#EF232E] text-white shadow-lg shadow-[#EF232E]/20' : 'bg-[#2a2a35] text-[#7E8299] hover:text-white'}`}
@@ -366,7 +503,117 @@ export function EvidenceViewer3D({
         </div>
       </div>
 
-      {/* 3D Canvas - Better lighting */}
+      {/* Hotspot List Panel (Edit Mode) */}
+      {isEditMode && (
+        <div className='bg-[#1a1a22] border-b border-[#2a2a35] p-4'>
+          <div className='flex items-center justify-between mb-4'>
+            <h3 className='text-white font-bold text-lg'>Hotspot Manager</h3>
+            <div className='flex gap-2'>
+              <button
+                onClick={() => setShowHotspotList(!showHotspotList)}
+                className='px-4 py-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-lg text-white text-sm'
+              >
+                {showHotspotList ? 'Hide List' : 'Show List'}
+              </button>
+              <button
+                onClick={handleResetHotspots}
+                className='px-4 py-2 bg-[#2a2a35] hover:bg-[#3a3a45] rounded-lg text-white text-sm'
+              >
+                Reset to Default
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                className='px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-white text-sm flex items-center gap-2'
+              >
+                <Save className='w-4 h-4' /> Save Changes
+              </button>
+            </div>
+          </div>
+          
+          {showHotspotList && (
+            <div className='grid grid-cols-3 gap-4'>
+              {/* Hotspot List */}
+              <div className='bg-[#0f0f14] rounded-xl p-4'>
+                <h4 className='text-[#7E8299] text-sm font-medium mb-3'>Current Hotspots ({localHotspots.length})</h4>
+                <div className='space-y-2 max-h-60 overflow-y-auto'>
+                  {localHotspots.map(hs => (
+                    <div 
+                      key={hs.id}
+                      onClick={() => setSelectedHotspotId(hs.id)}
+                      className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${
+                        selectedHotspotId === hs.id 
+                          ? 'bg-green-500/20 border border-green-500' 
+                          : 'bg-[#2a2a35] hover:bg-[#3a3a45]'
+                      }`}
+                    >
+                      <div>
+                        <p className='text-white text-sm font-medium'>{hs.label}</p>
+                        <p className='text-[#7E8299] text-xs'>Key: {hs.labelKey}</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteHotspot(hs.id)
+                        }}
+                        className='p-2 hover:bg-red-500/20 rounded-lg text-red-400'
+                      >
+                        <Trash2 className='w-4 h-4' />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Add New Hotspot */}
+              <div className='bg-[#0f0f14] rounded-xl p-4'>
+                <h4 className='text-[#7E8299] text-sm font-medium mb-3'>Add New Hotspot</h4>
+                <div className='space-y-3'>
+                  <div>
+                    <label className='text-[#7E8299] text-xs mb-1 block'>Label (shown on hover)</label>
+                    <input
+                      type='text'
+                      value={newHotspotLabel}
+                      onChange={(e) => setNewHotspotLabel(e.target.value)}
+                      placeholder='e.g., Serial Number'
+                      className='w-full bg-[#2a2a35] border border-[#3a3a45] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-green-500'
+                    />
+                  </div>
+                  <div>
+                    <label className='text-[#7E8299] text-xs mb-1 block'>Data Key (from database)</label>
+                    <input
+                      type='text'
+                      value={newHotspotLabelKey}
+                      onChange={(e) => setNewHotspotLabelKey(e.target.value)}
+                      placeholder='e.g., serialNumber'
+                      className='w-full bg-[#2a2a35] border border-[#3a3a45] rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-green-500'
+                    />
+                  </div>
+                  <button
+                    onClick={handleAddHotspot}
+                    disabled={!newHotspotLabel.trim() || !newHotspotLabelKey.trim()}
+                    className='w-full py-2 bg-green-600 hover:bg-green-500 disabled:bg-[#2a2a35] disabled:text-[#7E8299] rounded-lg text-white text-sm flex items-center justify-center gap-2'
+                  >
+                    <Plus className='w-4 h-4' /> Add Hotspot
+                  </button>
+                </div>
+              </div>
+              
+              {/* Instructions */}
+              <div className='bg-[#0f0f14] rounded-xl p-4'>
+                <h4 className='text-[#7E8299] text-sm font-medium mb-3'>Instructions</h4>
+                <div className='text-[#7E8299] text-sm space-y-2'>
+                  <p>1. Click on a hotspot in the list or on the 3D model to select it</p>
+                  <p>2. Use the 3D model controls to position the selected hotspot</p>
+                  <p>3. Edit the hotspot label and data key above</p>
+                  <p>4. Click "Save Changes" when done</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3D Canvas */}
       <div className='flex-1 relative' onClick={handleCanvasClick}>
         {modelPath ? (
           <Canvas 
@@ -377,47 +624,12 @@ export function EvidenceViewer3D({
               gl.toneMappingExposure = 1.5
             }}
           >
-            {/* Bright ambient light */}
             <ambientLight intensity={1.5} color='#ffffff' />
-            
-            {/* Main key light */}
-            <directionalLight 
-              position={[5, 5, 5]} 
-              intensity={2} 
-              color='#ffffff'
-              castShadow
-            />
-            
-            {/* Fill light */}
-            <directionalLight 
-              position={[-5, 3, -5]} 
-              intensity={1} 
-              color='#ccccff'
-            />
-            
-            {/* Rim light */}
-            <pointLight 
-              position={[0, 5, -5]} 
-              intensity={2} 
-              color='#EF232E'
-              distance={20}
-            />
-            
-            {/* Front fill */}
-            <pointLight 
-              position={[0, 2, 5]} 
-              intensity={1.5} 
-              color='#ffffff'
-              distance={15}
-            />
-            
-            {/* Bottom fill */}
-            <pointLight 
-              position={[0, -3, 0]} 
-              intensity={0.5} 
-              color='#333366'
-              distance={10}
-            />
+            <directionalLight position={[5, 5, 5]} intensity={2} color='#ffffff' castShadow />
+            <directionalLight position={[-5, 3, -5]} intensity={1} color='#ccccff' />
+            <pointLight position={[0, 5, -5]} intensity={2} color='#EF232E' distance={20} />
+            <pointLight position={[0, 2, 5]} intensity={1.5} color='#ffffff' distance={15} />
+            <pointLight position={[0, -3, 0]} intensity={0.5} color='#333366' distance={10} />
 
             <Suspense fallback={
               <Html center>
@@ -431,15 +643,18 @@ export function EvidenceViewer3D({
             }>
               <GLTFModelWithHotspots
                 modelPath={modelPath}
-                hotspots={hotspots}
+                hotspots={localHotspots}
                 evidenceData={evidenceData}
                 activeHotspot={activeHotspot}
                 setActiveHotspot={setActiveHotspot}
+                isEditMode={isEditMode}
+                selectedHotspotId={selectedHotspotId}
+                onSelectHotspot={handleSelectHotspot}
               />
             </Suspense>
             
             <OrbitControls 
-              autoRotate={autoRotate}
+              autoRotate={autoRotate && !isEditMode}
               autoRotateSpeed={1.2}
               enablePan={true}
               enableZoom={true}
@@ -462,7 +677,7 @@ export function EvidenceViewer3D({
         )}
 
         {/* Hotspot Info Panel */}
-        {hotspotInfo && (
+        {hotspotInfo && !isEditMode && (
           <div className='absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#1a1a22]/95 backdrop-blur-md border-2 border-[#EF232E] rounded-2xl px-8 py-5 shadow-2xl shadow-[#EF232E]/30 min-w-80'>
             <div className='flex items-center gap-4'>
               <div className='w-4 h-4 bg-[#EF232E] rounded-full animate-pulse' />
@@ -473,11 +688,11 @@ export function EvidenceViewer3D({
         )}
 
         {/* Hotspot count indicator */}
-        {hotspots.length > 0 && (
+        {!isEditMode && localHotspots.length > 0 && (
           <div className='absolute top-6 right-6 bg-[#1a1a22]/90 backdrop-blur-sm border border-[#2a2a35] rounded-xl px-4 py-2.5 shadow-xl'>
             <div className='flex items-center gap-2'>
               <span className='w-3 h-3 bg-[#EF232E] rounded-full animate-pulse' />
-              <span className='text-white font-semibold'>{hotspots.length}</span>
+              <span className='text-white font-semibold'>{localHotspots.length}</span>
               <span className='text-[#7E8299] text-sm'>hotspots</span>
             </div>
           </div>
@@ -523,10 +738,5 @@ export function EvidenceViewer3D({
   )
 }
 
-export function generateWeaponHotspots(data: any, type: string) {
-  return HOTSPOT_CONFIGS[type as keyof typeof HOTSPOT_CONFIGS] || HOTSPOT_CONFIGS.pistol
-}
-
-export function generateCarHotspots(data: any, vehicleType: 'car' | 'motorcycle' = 'car') {
-  return HOTSPOT_CONFIGS[vehicleType] || HOTSPOT_CONFIGS.car
-}
+// Export for use in admin panel
+export type { EvidenceViewer3DProps }

@@ -403,3 +403,11 @@ model DeleteRequest {
   reviewedAt    DateTime?
   createdAt     DateTime @default(now())
 }
+
+model HotspotTemplate {
+  id            String   @id @default(cuid())
+  modelType     String   @unique // 'pistol', 'rifle', 'car', 'motorcycle'
+  hotspots      String   // JSON string of hotspot configs
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
